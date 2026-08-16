@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,7 +29,7 @@ test("configuration stores only a token-file reference", async () => {
   const configRoot = join(root, "runtime-config-root");
   const tokenPath = join(configRoot, "runtime", "secrets", "local-api.token");
   await mkdir(join(configRoot, "runtime", "secrets"), { recursive: true });
-  const secret = "test-local-token-value-never-print"; // public-audit: allow-test-fixture
+  const secret = randomUUID().replaceAll("-", "");
   await writeFile(tokenPath, secret, "utf8");
   const runtimeConfig = join(root, "local-runtime.json");
   await writeFile(runtimeConfig, JSON.stringify({ installation: { config_root: configRoot } }), "utf8");
@@ -46,7 +47,7 @@ test("two host tools share one project while preserving sessions and roles", asy
   const integrationConfig = join(root, "integration.json");
   const stateDir = join(root, "state");
   const workspace = join(root, "workspace");
-  const localToken = "test-loopback-bearer-token-value"; // public-audit: allow-test-fixture
+  const localToken = randomUUID().replaceAll("-", "");
   await mkdir(workspace, { recursive: true });
   await writeFile(tokenFile, localToken, "utf8");
 
@@ -96,7 +97,7 @@ test("two host tools share one project while preserving sessions and roles", asy
     session_id: "codex-native-thread",
     turn_id: "codex-turn-1",
     cwd: workspace,
-    prompt: "Continue the storage adapter. API key = private-example-value", // public-audit: allow-test-fixture
+    prompt: `Continue the storage adapter. API key = ${randomUUID().replaceAll("-", "")}`,
   }, "codex", environment);
   assert.match(codexRecall.hookSpecificOutput.additionalContext, /Previous work/u);
   assert.match(codexRecall.hookSpecificOutput.additionalContext, /trust="untrusted"/u);
