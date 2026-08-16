@@ -42,6 +42,12 @@ TMCRA Local Memory 让 Codex 在不同会话和已支持的 Agent 工具之间�
 
 本仓库只发行 Codex 接入层。记忆引擎、本地 API、模型选择、存储和模型供应商配置位于 TMCRA 主仓库。
 
+## 内置 Codex Skill
+
+插件现在包含可实际调用的 `manage-tmcra-memory` Skill。用户明确要求召回旧项目上下文、记住一项决定、检查异步写入或重试待处理写入时，Codex 可以启用它。普通对话每轮的自动召回与写回仍由四个生命周期 Hook 完成，因此 Skill 不会重复写入同一轮消息。
+
+连接独立发行的 [TMCRA MCP Server](https://github.com/reshuibuduo/TMCRA-MCP-Server) 后，Skill 会使用公开的召回、写入、回合生命周期、队列恢复和任务状态工具。它会保留项目 scope、会话来源、消息角色与 Agent 归属，并准确区分成功、等待中和失败状态。
+
 ## 从 Awesome Codex Plugins 安装
 
 ```bash

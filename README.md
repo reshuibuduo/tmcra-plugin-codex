@@ -42,6 +42,12 @@ The plugin uses four Codex hooks:
 
 The plugin contains the Codex bridge. The memory engine, local API, model selection, storage, and provider configuration live in the TMCRA runtime repository.
 
+## Included Codex Skill
+
+The plugin now ships the real `manage-tmcra-memory` Skill. Codex can activate it when a user explicitly asks to recall prior project context, remember a decision, inspect an asynchronous write, or reconcile a pending write. Normal per-turn recall and capture remain the responsibility of the four lifecycle Hooks, so the Skill does not create duplicate records.
+
+When the standalone [TMCRA MCP Server](https://github.com/reshuibuduo/TMCRA-MCP-Server) is connected, the Skill uses its published recall, ingest, lifecycle, reconciliation, and job-status tools. It preserves project scope, session provenance, message role, and Agent attribution, and it reports pending or failed writes without claiming they succeeded.
+
 ## Install from Awesome Codex Plugins
 
 ```bash

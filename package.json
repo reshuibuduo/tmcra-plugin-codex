@@ -1,6 +1,6 @@
 {
   "name": "tmcra-local-memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Owner-local TMCRA lifecycle hooks for Codex",
   "type": "module",

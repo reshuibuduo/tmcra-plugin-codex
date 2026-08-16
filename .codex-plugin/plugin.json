@@ -1,6 +1,6 @@
 {
   "name": "tmcra-local-memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Automatic cross-session and cross-tool project memory for Codex through the owner-local TMCRA runtime.",
   "author": {
     "name": "Yu Haoxin",
@@ -16,6 +16,7 @@
     "cross-tool",
     "local-first"
   ],
+  "skills": "./skills/",
   "interface": {
     "displayName": "TMCRA Local Memory",
     "shortDescription": "Continue project work across Codex sessions and supported agent tools.",
