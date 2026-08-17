@@ -1,6 +1,7 @@
 ---
 name: manage-tmcra-memory
 description: Recall, store, and verify long-term project memory with the TMCRA MCP tools. Use when a user explicitly asks to remember information, recover prior project context, continue work across sessions or supported agent tools, inspect an asynchronous memory write, or retry a pending write. Also use when an MCP host needs the explicit prepare-answer-commit lifecycle. Do not invoke it merely because TMCRA Hooks already supplied automatic context for an ordinary Codex turn.
+license: Apache-2.0
 ---
 
 # Manage TMCRA Memory
