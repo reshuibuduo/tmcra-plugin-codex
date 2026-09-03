@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tmcra-memory": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "mcp_server.mjs"]
+    }
+  }
+}

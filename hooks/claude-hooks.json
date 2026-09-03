@@ -1,5 +1,5 @@
 {
-  "description": "TMCRA owner-local lifecycle hooks for Claude Code.",
+  "description": "TMCRA Memory lifecycle hooks for Claude Code. This configuration is separate from the Codex hook configuration.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,9 +7,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/run_hook.mjs", "session-start", "claude-code"],
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "session_start.mjs"],
             "timeout": 12,
-            "statusMessage": "Checking local TMCRA memory"
+            "statusMessage": "Loading TMCRA memory"
           }
         ]
       }
@@ -20,9 +20,48 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/run_hook.mjs", "user-prompt", "claude-code"],
-            "timeout": 120,
-            "statusMessage": "Recalling local TMCRA memory"
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "user_prompt_submit.mjs"],
+            "timeout": 30,
+            "statusMessage": "Recalling TMCRA memory"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "post_tool_use.mjs"],
+            "timeout": 12,
+            "statusMessage": "Recording TMCRA task progress"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "pre_compact.mjs"],
+            "timeout": 12,
+            "statusMessage": "Checkpointing TMCRA task memory"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "post_compact.mjs"],
+            "timeout": 12,
+            "statusMessage": "Recording compaction state"
           }
         ]
       }
@@ -33,9 +72,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/run_hook.mjs", "stop", "claude-code"],
-            "timeout": 120,
-            "statusMessage": "Saving the completed turn locally"
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "stop.mjs"],
+            "timeout": 12,
+            "statusMessage": "Saving turn to TMCRA"
           }
         ]
       }
@@ -47,9 +86,35 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/run_hook.mjs", "stop-failure", "claude-code"],
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "stop.mjs"],
             "timeout": 12,
-            "statusMessage": "Closing the local memory turn"
+            "statusMessage": "Checkpointing failed turn to TMCRA"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "subagent_start.mjs"],
+            "timeout": 12,
+            "statusMessage": "Starting isolated TMCRA subagent memory"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/claude_run_hook.mjs", "subagent_stop.mjs"],
+            "timeout": 12,
+            "statusMessage": "Saving subagent turn to TMCRA"
           }
         ]
       }

@@ -5,9 +5,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" session-start codex",
+            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" \"session_start.mjs\"",
             "timeout": 12,
-            "statusMessage": "Checking local TMCRA memory"
+            "statusMessage": "Loading TMCRA memory"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" \"subagent_start.mjs\"",
+            "timeout": 12,
+            "statusMessage": "Starting isolated TMCRA subagent memory"
           }
         ]
       }
@@ -17,9 +29,45 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" user-prompt codex",
-            "timeout": 120,
-            "statusMessage": "Recalling local TMCRA memory"
+            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" \"user_prompt_submit.mjs\"",
+            "timeout": 12,
+            "statusMessage": "Recalling TMCRA memory"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" \"post_tool_use.mjs\"",
+            "timeout": 12,
+            "statusMessage": "Recording TMCRA task progress"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" \"pre_compact.mjs\"",
+            "timeout": 12,
+            "statusMessage": "Checkpointing TMCRA task memory"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" \"post_compact.mjs\"",
+            "timeout": 12,
+            "statusMessage": "Restoring TMCRA task memory"
           }
         ]
       }
@@ -29,9 +77,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" stop codex",
-            "timeout": 120,
-            "statusMessage": "Saving the completed turn locally"
+            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" \"stop.mjs\"",
+            "timeout": 12,
+            "statusMessage": "Saving turn to TMCRA"
           }
         ]
       }
@@ -42,9 +90,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" stop-failure codex",
+            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" \"stop.mjs\"",
             "timeout": 12,
-            "statusMessage": "Closing the local memory turn"
+            "statusMessage": "Checkpointing failed turn to TMCRA"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/run_hook.mjs\" \"subagent_stop.mjs\"",
+            "timeout": 12,
+            "statusMessage": "Saving subagent turn to TMCRA"
           }
         ]
       }

@@ -1,116 +1,128 @@
-# TMCRA Local Memory for Codex
+# TMCRA Memory for Codex
 
-![TMCRA Local Memory: cross-tool memory, continuous work](assets/overview.png)
+TMCRA Memory adds automatic long-term memory to Codex through the public TMCRA API. It does not require access to the TMCRA server.
 
-TMCRA Local Memory lets Codex continue project work across sessions and supported agent tools. It connects Codex lifecycle hooks to the owner-local [TMCRA Agent Memory](https://github.com/reshuibuduo/TMCRA-Agent-Memory) runtime. The plugin sends memory traffic only to the loopback TMCRA API; local-model or BYOK provider traffic follows the runtime configuration chosen by the user.
-
-[中文说明](README.zh-CN.md)
+This repository is the standalone distribution mirror of the plugin maintained in the [TMCRA monorepo](https://github.com/reshuibuduo/tmcra/tree/main/07-tmcra-codex-plugins/tmcra-memory). Download the versioned ZIP and its SHA-256 file from [GitHub Releases](https://github.com/reshuibuduo/tmcra-plugin-codex/releases).
 
 ## What it does
 
-- **Continue across Codex sessions.** Each prompt recalls relevant owner-global and current-project evidence before Codex answers.
-- **Share project memory across tools.** Compatible adapters resolve the same project through `.tmcra/project.json`, Git origin, Git root, or a canonical directory path.
-- **Preserve who said what.** User messages and Codex answers are written as separate, source-attributed records.
-- **Keep sessions inside projects.** A session remains provenance and grouping metadata under its project; it is not treated as an independent recall scope.
-- **Retry local writes safely.** Temporary runtime failures enter an owner-only local outbox and retry on the next lifecycle event.
-- **Protect the host workflow.** Hook failures are fail-open, recalled memory is marked as untrusted data, and common credential formats are redacted before recall or storage.
+- Initializes the global/project scope at `SessionStart` without recalling or injecting memory.
+- Recalls relevant global and project memory only after `UserPromptSubmit`, using the current prompt as the query.
+- Includes both user records (requirements and facts) and assistant records (Codex work progress and results) in recall, while keeping their actor and provenance labels separate.
+- Applies authority in this order: current user instruction, historical user requirements/facts, then historical Codex progress/results. Assistant records never become user statements.
+- Captures the completed user/assistant turn at `Stop`.
+- Records bounded, redacted tool progress locally during long turns with `PostToolUse`.
+- Creates an idempotent continuity checkpoint before `PreCompact`, records `PostCompact`, and restores the local checkpoint plus relevant long-term memory from `SessionStart(source=compact)`.
+- Keeps stable user facts in a global layer, each project in a separate scope, and each Codex task as a session inside its project.
+- Provides explicit MCP tools for inspecting the latest automatic recall, running a fresh recall, ingesting memory, and checking jobs.
+- Can import retained Codex history or bootstrap a baseline from the current repository.
 
-## Lifecycle
+## See what was recalled
 
-```text
-Current prompt
-  -> recall owner-global + current-project memory
-  -> inject bounded, source-labelled evidence into Codex
-  -> Codex answers
-  -> store USER and CODEX records separately
-```
+Automatic recall stays out of the way during normal work. After Codex finishes an answer, ask **"Show the TMCRA memory used for my latest answer"** or **"查看上一轮回答的召回"**. Codex calls `tmcra_last_recall` with its default `latest_answer` view and shows the global/project evidence and counts promoted by that answer's `Stop` Hook. The new inspection prompt cannot overwrite this completed-answer receipt. Use `view=current_prompt` only to inspect the prompt Codex is processing right now. Neither view runs another search, and both omit internal scope identifiers, database paths, tenant data, and retrieval diagnostics.
 
-The plugin uses four Codex hooks:
+Codex Hooks do not expose a third-party custom side panel. The explicit inspection tool is therefore the in-Codex audit surface; the TMCRA desktop application can provide a longer activity history separately.
 
-| Hook | Purpose |
-| --- | --- |
-| `SessionStart` | Checks the loopback TMCRA runtime and retries queued writes. |
-| `UserPromptSubmit` | Recalls relevant memory, injects evidence, and stores the redacted user prompt. |
-| `Stop` | Stores the visible Codex answer as a separate assistant record. |
-| `StopFailure` | Closes pending turn state without inventing an assistant answer. |
+## Windows installation
 
-## Requirements
-
-- Node.js 18 or newer.
-- A Codex build with plugin marketplaces and Hooks support.
-- The [TMCRA owner-local runtime](https://github.com/reshuibuduo/TMCRA-Agent-Memory) installed and listening on an exact loopback address.
-
-The plugin contains the Codex bridge. The memory engine, local API, model selection, storage, and provider configuration live in the TMCRA runtime repository.
-
-## Included Codex Skill
-
-The plugin now ships the real `manage-tmcra-memory` Skill. Codex can activate it when a user explicitly asks to recall prior project context, remember a decision, inspect an asynchronous write, or reconcile a pending write. Normal per-turn recall and capture remain the responsibility of the four lifecycle Hooks, so the Skill does not create duplicate records.
-
-When the standalone [TMCRA MCP Server](https://github.com/reshuibuduo/TMCRA-MCP-Server) is connected, the Skill uses its published recall, ingest, lifecycle, reconciliation, and job-status tools. It preserves project scope, session provenance, message role, and Agent attribution, and it reports pending or failed writes without claiming they succeeded.
-
-## Install from Awesome Codex Plugins
-
-```bash
-codex plugin marketplace add \
-  'https://github.com/hashgraph-online/awesome-codex-plugins.git' \
-  --ref 'main' \
-  --sparse '.agents/plugins' \
-  --sparse 'plugins'
-codex plugin install tmcra-local-memory --source awesome-codex-plugins
-```
-
-The registry mirrors this repository as the installable plugin bundle. Source contributors can run the validation commands below without registering a second persistent marketplace.
-
-## Configure the local runtime bridge
-
-Install and start TMCRA first. Then let the TMCRA source checkout write the integration configuration without installing its bundled development copy of the plugin.
-
-Windows PowerShell:
+Download the versioned release ZIP, verify the adjacent SHA-256 file, extract it to a stable local directory, then run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-local.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\install-codex-local.ps1 -SkipPluginInstall
+.\Install-TMCRA.ps1
 ```
 
-macOS or Linux:
+The installer registers the bundled marketplace, installs the plugin into the same plugin registry used by Codex Desktop, enables the Codex Hooks feature, and removes obsolete duplicate TMCRA MCP registrations. It then opens the TMCRA verification page and shows a short user code. Sign in and approve this Codex installation in the browser; the installer receives a scoped access token through PKCE and stores it in the protected local TMCRA configuration. It never prints the access token, device code, PKCE verifier, or delivery receipt. The Token remains short-lived until the installer confirms that the protected config write succeeded. If confirmation is interrupted, rerunning the installer resumes that saved confirmation instead of minting another Token.
 
-```bash
-./scripts/install-local.sh
-TMCRA_SKIP_CODEX_PLUGIN_INSTALL=1 ./scripts/install-codex-local.sh
+After installation, restart Codex Desktop and confirm **TMCRA Memory** appears as enabled in the Plugins page. Run `/hooks`, inspect and trust all nine TMCRA lifecycle hooks: `SessionStart`, `SubagentStart`, `UserPromptSubmit`, `PostToolUse`, `PreCompact`, `PostCompact`, `Stop`, `StopFailure`, and `SubagentStop`. Codex intentionally requires this review; the installer cannot silently grant Hook trust. `StopFailure` only checkpoints the user request when an answer fails; it never stores provider error text as assistant memory. Start a new task and complete one turn, then use the desktop application's **Verify real Codex execution** action or call the `tmcra_status` MCP tool. Ready is reported only after SessionStart, recall, and capture events from the current plugin version have all been observed.
+
+## macOS and Linux installation
+
+Download and extract the same versioned release ZIP, then run:
+
+```sh
+sh ./install.sh
 ```
 
-Restart Codex, open `/hooks`, review the four **TMCRA Local Memory** hooks, and trust them. Codex keeps this explicit trust step under user control.
+Node.js 18 or newer and the Codex CLI must be available on `PATH`.
 
-Advanced users can configure a non-default TMCRA runtime directly from this repository:
+The same browser authorization flow is used on every platform. If a browser cannot be opened automatically, copy the displayed verification link into a browser and enter the displayed user code.
 
-```bash
-node scripts/configure.mjs \
-  --runtime-config /absolute/path/to/local-runtime.json \
-  --base-url http://127.0.0.1:2009
+## Account and console
+
+Normal users do not need SSH access or a server API key. Browser authorization links the local Codex installation to the signed-in TMCRA account. Use [tmcra.com](https://tmcra.com) to approve or revoke Codex installations, inspect global/project/session boundaries, view the memory graph, and check server-reported usage and remaining quota. Rerun the installer if the local authorization expires or is revoked.
+
+## Project identity
+
+No project setup is required. The adapter uses `.tmcra/project.json` when present, otherwise Git origin/root identity, and finally the absolute project path. To pin a stable identity before moving or cloning a project:
+
+```powershell
+node .\plugins\tmcra-memory\scripts\project_init.mjs --path "D:\work\my-project" --name "My project"
 ```
 
-The generated integration config stores only the absolute token-file path. It never copies or prints the bearer token.
+Do not copy the same `.tmcra/project.json` into unrelated projects.
 
-## Security boundary
+## Existing Codex history
 
-- API destinations are limited to `localhost`, `127.0.0.1`, or `::1`.
-- The local bearer token is read from its owner-only file for every request.
-- Prompts and responses are bounded and scrubbed for common secret formats before leaving the hook process.
-- Retrieved memory is wrapped as untrusted evidence, never executable instructions.
-- Diagnostic logs contain a bounded error name and message. They do not contain prompts or answers.
-- This repository contains no TMCRA production service code or production credentials.
+The TMCRA Memory desktop application always exposes this flow under **History migration**. After the plugin is installed, a project can be previewed locally before sign-in; importing stays disabled until the account is connected. Choose one project for a read-only preview, review the task/message and excluded-credential counts, then confirm the import in the native warning dialog. The application re-runs the preview in its main process before importing and waits for every accepted write to finish.
 
-See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+Preview is read-only and performs no upload:
 
-## Development
+```powershell
+node .\plugins\tmcra-memory\scripts\history_import.mjs preview
+```
 
-```bash
+After reviewing the result, import one project explicitly:
+
+```powershell
+node .\plugins\tmcra-memory\scripts\history_import.mjs import --project "D:\work\my-project" --confirm --wait
+```
+
+Use `--source` when the historical transcript points at an older location. The importer includes only user and assistant messages; it excludes reasoning, tool logs, developer instructions, private keys, passwords, and credential-like content.
+
+If the old transcript is gone, create a baseline from the current repository and recent Git history:
+
+```powershell
+node .\plugins\tmcra-memory\scripts\project_bootstrap.mjs preview --project "D:\work\my-project"
+node .\plugins\tmcra-memory\scripts\project_bootstrap.mjs import --project "D:\work\my-project" --confirm
+```
+
+This is a repository snapshot, not reconstructed conversation history.
+
+## Configuration
+
+The default configuration file is `~/.config/tmcra/config.json`. Environment variables override it:
+
+- `TMCRA_ACCESS_TOKEN`
+- `TMCRA_API_KEY`
+- `TMCRA_BASE_URL`
+- `TMCRA_SCOPE_NAMESPACE`
+- `TMCRA_GLOBAL_SCOPE`
+- `TMCRA_PROJECT_SCOPE_PREFIX`
+- `TMCRA_HOOK_REQUEST_TIMEOUT_MS` (automatic Hooks only; defaults to 9000 ms and is capped at 10000 ms)
+- `TMCRA_CHECKPOINT_EVENT_THRESHOLD` (significant tool events before a periodic long-task checkpoint; defaults to 24)
+- `TMCRA_CHECKPOINT_BYTE_THRESHOLD` (redacted tool-summary characters before a checkpoint; defaults to 48000)
+- `TMCRA_CHECKPOINT_AGE_MS` (maximum active time between tool-progress checkpoints; defaults to 600000 ms)
+
+The normal installer uses device authorization; it does not ask the user to paste a credential. `-ApiKey` on Windows and `TMCRA_SETUP_API_KEY` on any platform remain available only for explicit developer, self-hosted and automated test setups:
+
+```powershell
+.\Install-TMCRA.ps1 -ApiKey $env:TMCRA_SETUP_API_KEY -BaseUrl "https://api.example.invalid"
+```
+
+Never place a TMCRA API key or access token in a prompt, project source file, browser bundle, command example, or shell history.
+
+## Reliability and privacy
+
+Hooks fail open: an unavailable memory service must not block Codex. Automatic Hook calls use a short request timeout independent from longer explicit MCP operations. Writes are asynchronous and idempotent. The access token is stored only in the protected local TMCRA configuration; it is never ingested as memory. The plugin does not store chain-of-thought or developer instructions. During a long turn it keeps bounded tool input/output excerpts for continuity, applies credential redaction before local persistence, and sends only thresholded or pre-compaction checkpoints rather than one API write per tool call. Passwords, access tokens, verification codes, and private keys are excluded from checkpoint content.
+
+Lifecycle Hooks and the bundled MCP server honor `HTTPS_PROXY`, `HTTP_PROXY`, and `ALL_PROXY`. On Windows, when those variables are absent, the runtime launcher also reads the enabled per-user system proxy so Codex works with proxy clients that use a fake-IP DNS range. Loopback TMCRA endpoints bypass the proxy.
+
+## Development verification
+
+```sh
 npm ci
 npm run verify
+npm run build:release
 ```
 
-The test suite runs a real loopback HTTP fixture and verifies cross-tool project identity, per-session separation, role provenance, redaction, recall injection, and user/assistant writeback.
-
-## License
-
-Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+The deterministic suite starts isolated mock services and does not read normal Codex history or contact the public TMCRA API. It verifies Codex and Claude Code lifecycle contracts, device authorization, scope isolation, durable writes, credential redaction, MCP tools, history preview/import rules, repository bootstrap, and release packaging on Windows and Linux.

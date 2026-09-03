@@ -1,0 +1,20 @@
+{
+  "name": "tmcra-local",
+  "interface": {
+    "displayName": "TMCRA"
+  },
+  "plugins": [
+    {
+      "name": "tmcra-memory",
+      "source": {
+        "source": "local",
+        "path": "./plugins/tmcra-memory"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

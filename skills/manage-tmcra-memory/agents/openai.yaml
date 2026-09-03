@@ -1,4 +1,4 @@
 interface:
-  display_name: "TMCRA Memory"
-  short_description: "Recall, store, and verify TMCRA project memory"
-  default_prompt: "Use $manage-tmcra-memory to recall the relevant project context and verify any memory write."
+  display_name: "Manage TMCRA Memory"
+  short_description: "Connect, recall, store, and inspect TMCRA memory"
+  default_prompt: "Use $manage-tmcra-memory to show the memory used for the latest completed answer or manage TMCRA memory for this task."

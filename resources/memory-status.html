@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #182027; background: #f8fafb; }
+    main { display: grid; gap: 14px; padding: 18px; }
+    header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    h1 { margin: 2px 0 0; font-size: 18px; line-height: 1.3; letter-spacing: 0; }
+    .eyebrow { margin: 0; color: #64717d; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .state { padding: 4px 8px; border: 1px solid #b8c3cc; border-radius: 4px; color: #45515b; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .state[data-state="ready"] { border-color: #8bb8a0; color: #17603a; background: #edf7f1; }
+    .state[data-state="recovering"] { border-color: #9caedf; color: #304d92; background: #eef2fc; }
+    .state[data-state="attention_required"] { border-color: #d5a191; color: #8a3022; background: #fbeeea; }
+    .progress { display: grid; gap: 7px; padding: 13px 0; border-top: 1px solid #dce2e7; border-bottom: 1px solid #dce2e7; }
+    .progress-line { display: flex; justify-content: space-between; gap: 12px; color: #4e5b66; font-size: 12px; }
+    .progress-line strong { color: #182027; }
+    progress { width: 100%; height: 8px; overflow: hidden; border: 0; border-radius: 3px; background: #e2e7eb; }
+    progress::-webkit-progress-bar { background: #e2e7eb; }
+    progress::-webkit-progress-value { background: #526fc2; }
+    progress::-moz-progress-bar { background: #526fc2; }
+    .detail { margin: 0; color: #4e5b66; font-size: 12px; line-height: 1.55; }
+    .layers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .layer { min-width: 0; padding-top: 10px; border-top: 2px solid #a8b4bd; }
+    .layer[data-state="recovering"] { border-color: #526fc2; }
+    .layer[data-state="attention_required"] { border-color: #b94a38; }
+    .layer h2 { margin: 0 0 5px; font-size: 12px; letter-spacing: 0; }
+    .layer p { margin: 0; color: #64717d; font-size: 11px; line-height: 1.45; }
+    .queue { margin: 0; color: #64717d; font-size: 11px; }
+    @media (max-width: 520px) { .layers { grid-template-columns: 1fr; } }
+    @media (prefers-color-scheme: dark) {
+      body { color: #e7edf1; background: #171b1f; }
+      .eyebrow, .detail, .layer p, .queue { color: #aab5be; }
+      .progress { border-color: #343b41; }
+      .progress-line { color: #b8c2ca; }
+      .progress-line strong { color: #f1f4f6; }
+      progress, progress::-webkit-progress-bar { background: #30373d; }
+      .state[data-state="ready"] { color: #8fd3ad; background: #193326; }
+      .state[data-state="recovering"] { color: #acbdf1; background: #202c4e; }
+      .state[data-state="attention_required"] { color: #efaa9f; background: #45251f; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div><p class="eyebrow">TMCRA / MEMORY STATUS</p><h1 id="title">正在读取状态</h1></div>
+      <span id="state" class="state">CHECKING</span>
+    </header>
+    <section id="progress" class="progress" hidden>
+      <div class="progress-line"><span id="phase"></span><strong id="percent">0%</strong></div>
+      <progress id="bar" max="100" value="0"></progress>
+      <p id="counts" class="detail"></p>
+    </section>
+    <p id="detail" class="detail"></p>
+    <section class="layers">
+      <article id="global" class="layer"><h2>全局记忆</h2><p></p></article>
+      <article id="project" class="layer"><h2>项目记忆</h2><p></p></article>
+    </section>
+    <p id="queue" class="queue"></p>
+  </main>
+  <script type="module">
+    const zh = (navigator.language || "").toLowerCase().startsWith("zh");
+    const labels = {
+      ready: zh ? "运行正常" : "Ready",
+      recovering: zh ? "自动恢复中" : "Recovering",
+      attention_required: zh ? "需要支持介入" : "Support required",
+      unknown: zh ? "状态未知" : "Unknown",
+      waiting: zh ? "等待安全重试" : "Waiting for a safe retry",
+      auditing: zh ? "审计记忆一致性" : "Auditing memory consistency",
+      repairing: zh ? "修复记忆记录" : "Repairing memory records",
+      indexing: zh ? "重建检索索引" : "Rebuilding retrieval index",
+      verifying: zh ? "验证修复结果" : "Verifying recovery",
+      manual_review: zh ? "等待支持处理" : "Waiting for support",
+    };
+    let output = null;
+    let rpcId = 0;
+    let pollTimer = null;
+    const pending = new Map();
+    const notify = (method, params) => window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
+    const request = (method, params) => new Promise((resolve, reject) => {
+      const id = ++rpcId;
+      pending.set(id, { resolve, reject });
+      window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+    });
+    const layerText = (value) => {
+      if (!value || value.state === "unknown") return labels.unknown;
+      if (value.state === "ready") return labels.ready;
+      const count = value.totalItems > 0 ? ` · ${value.completedItems}/${value.totalItems}` : "";
+      return `${labels[value.phase] || labels.waiting}${count}`;
+    };
+    const render = () => {
+      const recovery = output?.recovery;
+      const state = recovery?.state || (output?.ok ? "ready" : "unknown");
+      document.querySelector("#title").textContent = labels[state] || labels.unknown;
+      const badge = document.querySelector("#state");
+      badge.dataset.state = state;
+      badge.textContent = state.replaceAll("_", " ").toUpperCase();
+      const active = recovery?.active === true;
+      document.querySelector("#progress").hidden = !active;
+      if (active) {
+        const percent = Math.max(0, Math.min(100, Number(recovery.progressPercent) || 0));
+        document.querySelector("#phase").textContent = labels[recovery.phase] || labels.waiting;
+        document.querySelector("#percent").textContent = `${percent}%`;
+        document.querySelector("#bar").value = percent;
+        document.querySelector("#counts").textContent = recovery.totalItems > 0
+          ? `${zh ? "已确认" : "Confirmed"} ${recovery.completedItems} / ${recovery.totalItems}`
+          : (zh ? "正在建立恢复清单" : "Preparing the recovery inventory");
+      }
+      document.querySelector("#detail").textContent = output?.nextAction
+        || (zh ? "生命周期钩子和记忆服务运行正常。" : "Lifecycle hooks and memory service are operating normally.");
+      for (const name of ["global", "project"]) {
+        const node = document.querySelector(`#${name}`);
+        const value = recovery?.layers?.[name];
+        node.dataset.state = value?.state || "unknown";
+        node.querySelector("p").textContent = layerText(value);
+      }
+      const queued = Number(output?.capture?.queuedCount || 0);
+      const submitted = Number(output?.capture?.submittedCount || 0);
+      const failed = Number(output?.capture?.failedCount || 0);
+      document.querySelector("#queue").textContent = queued > 0
+        ? `${zh ? "本地安全队列" : "Local durable queue"}: ${queued}${submitted ? ` | ${zh ? "已提交" : "Submitted"}: ${submitted}` : ""}${failed ? ` | ${zh ? "失败" : "Failed"}: ${failed}` : ""}`
+        : (zh ? "本地待写队列为空" : "Local write queue is empty");
+      if (pollTimer) clearTimeout(pollTimer);
+      if (active && !recovery.requiresSupport) {
+        pollTimer = setTimeout(() => void refresh(), 3000);
+      }
+    };
+    const refresh = async () => {
+      try {
+        const response = await request("tools/call", { name: "tmcra_status", arguments: {} });
+        output = response?.structuredContent ?? output;
+        render();
+      } catch {}
+    };
+    window.addEventListener("message", (event) => {
+      if (event.source !== window.parent) return;
+      const message = event.data;
+      if (!message || message.jsonrpc !== "2.0") return;
+      if (typeof message.id === "number") {
+        const waiting = pending.get(message.id);
+        if (!waiting) return;
+        pending.delete(message.id);
+        return message.error ? waiting.reject(message.error) : waiting.resolve(message.result);
+      }
+      if (message.method === "ui/notifications/tool-result") {
+        output = message.params?.structuredContent ?? null;
+        render();
+      }
+    }, { passive: true });
+    await request("ui/initialize", {
+      appInfo: { name: "tmcra-memory-status", version: "1.0.0" },
+      appCapabilities: {},
+      protocolVersion: "2026-01-26",
+    });
+    notify("ui/notifications/initialized", {});
+    render();
+  </script>
+</body>
+</html>

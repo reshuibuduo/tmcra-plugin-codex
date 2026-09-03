@@ -1,0 +1,36 @@
+name: Plugin contracts
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24.19.0"
+          cache: npm
+      - run: npm ci
+      - name: Verify Codex and Claude Code contracts
+        env:
+          TMCRA_TEST_POWERSHELL: ${{ runner.os == 'Windows' && 'pwsh' || '' }}
+        run: npm run verify
+      - name: Build self-contained release archive
+        shell: pwsh
+        run: |
+          npm run build:release
+          $archive = Join-Path "${{ github.workspace }}" "release/tmcra-codex-latest.zip"
+          if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) {
+            throw "TMCRA Codex release archive was not created."
+          }

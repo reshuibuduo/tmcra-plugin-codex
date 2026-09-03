@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #182027; background: #f8fafb; }
+    main { display: grid; gap: 14px; padding: 18px; }
+    header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    h1 { margin: 2px 0 0; font-size: 18px; letter-spacing: 0; }
+    .eyebrow { margin: 0; color: #64717d; font-size: 11px; font-weight: 700; }
+    .count { font-size: 22px; font-weight: 720; }
+    .meta { margin: 0; color: #64717d; font-size: 11px; line-height: 1.5; }
+    .query { margin: 0; padding: 10px 0; border-top: 1px solid #dce2e7; border-bottom: 1px solid #dce2e7; color: #3e4a54; font-size: 12px; line-height: 1.55; }
+    .evidence { display: grid; gap: 12px; }
+    section { min-width: 0; padding-top: 10px; border-top: 2px solid #8d9aa5; }
+    section[data-layer="project"] { border-color: #526fc2; }
+    section h2 { margin: 0 0 7px; font-size: 12px; letter-spacing: 0; }
+    pre { max-height: 310px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #34414b; font: 11px/1.55 "Cascadia Mono", Consolas, monospace; }
+    .empty { margin: 0; color: #64717d; font-size: 12px; }
+    footer { color: #73808a; font-size: 10px; }
+    @media (prefers-color-scheme: dark) {
+      body { color: #e7edf1; background: #171b1f; }
+      .eyebrow, .empty, footer { color: #aab5be; }
+      .query { border-color: #343b41; color: #c6d0d7; }
+      pre { color: #d3dbe0; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header><div><p class="eyebrow">TMCRA / RECALL RECEIPT</p><h1 id="title">本轮召回</h1></div><strong id="count" class="count">0</strong></header>
+    <p id="status" class="meta"></p>
+    <p id="query" class="query"></p>
+    <div id="evidence" class="evidence"></div>
+    <p id="empty" class="empty" hidden></p>
+    <footer id="time"></footer>
+  </main>
+  <script type="module">
+    const zh = (navigator.language || "").toLowerCase().startsWith("zh");
+    let output = null;
+    let rpcId = 0;
+    const pending = new Map();
+    const notify = (method, params) => window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
+    const request = (method, params) => new Promise((resolve, reject) => {
+      const id = ++rpcId;
+      pending.set(id, { resolve, reject });
+      window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+    });
+    const render = () => {
+      const count = Number(output?.counts?.total || 0);
+      document.querySelector("#title").textContent = zh ? "本轮召回" : "Recall for this turn";
+      document.querySelector("#count").textContent = String(count);
+      document.querySelector("#status").textContent = `Status: ${String(output?.status || "unknown")}`;
+      const query = String(output?.query || "").trim();
+      const queryNode = document.querySelector("#query");
+      queryNode.hidden = !query;
+      queryNode.textContent = query;
+      const container = document.querySelector("#evidence");
+      container.replaceChildren();
+      const layers = [
+        ["global", zh ? "全局记忆" : "Global memory"],
+        ["project", zh ? "项目记忆" : "Project memory"],
+      ];
+      for (const [key, label] of layers) {
+        const content = String(output?.evidence?.[key]?.content || "").trim();
+        const layerCount = Number(output?.counts?.[key] || 0);
+        if (!content && layerCount === 0) continue;
+        const section = document.createElement("section");
+        section.dataset.layer = key;
+        const heading = document.createElement("h2");
+        const layer = output?.layers?.[key] || {};
+        const queryId = output?.query_ids?.[key] || "-";
+        const requestId = output?.request_ids?.[key] || "-";
+        heading.textContent = `${label} / ${layer.status || "unknown"} / ${layerCount}`;
+        const identifiers = document.createElement("p");
+        identifiers.className = "meta";
+        identifiers.textContent = `Query: ${queryId} | Request: ${requestId}`;
+        heading.textContent = `${label} · ${layerCount}`;
+        const evidence = document.createElement("pre");
+        evidence.textContent = content;
+        section.append(heading, identifiers, evidence);
+        container.append(section);
+      }
+      const empty = document.querySelector("#empty");
+      empty.hidden = count > 0;
+      empty.textContent = zh ? "本轮召回完成，0 条命中。" : "Recall completed with 0 matches.";
+      const timestamp = output?.completed_at || output?.recalled_at;
+      const writeState = output?.ingest?.state;
+      document.querySelector("#time").textContent = timestamp
+        ? `${zh ? "完成时间" : "Completed"}: ${new Date(timestamp).toLocaleString()}${writeState ? ` | ${zh ? "写入" : "Write"}: ${writeState}` : ""}`
+        : "";
+    };
+    window.addEventListener("message", (event) => {
+      if (event.source !== window.parent) return;
+      const message = event.data;
+      if (!message || message.jsonrpc !== "2.0") return;
+      if (typeof message.id === "number") {
+        const waiting = pending.get(message.id);
+        if (!waiting) return;
+        pending.delete(message.id);
+        return message.error ? waiting.reject(message.error) : waiting.resolve(message.result);
+      }
+      if (message.method === "ui/notifications/tool-result") {
+        output = message.params?.structuredContent ?? null;
+        render();
+      }
+    }, { passive: true });
+    await request("ui/initialize", {
+      appInfo: { name: "tmcra-recall-inspector", version: "1.0.0" },
+      appCapabilities: {},
+      protocolVersion: "2026-01-26",
+    });
+    notify("ui/notifications/initialized", {});
+    render();
+  </script>
+</body>
+</html>

@@ -1,22 +1,22 @@
 # Security policy
 
-## Supported versions
+## Supported version
 
 Security fixes are applied to the latest release on the default branch.
 
 ## Reporting a vulnerability
 
-Use GitHub private vulnerability reporting for this repository. Do not open a public issue containing credentials, private memory data, a working exploit, or a path to another user's local files.
+Use this repository's private vulnerability-reporting form. Do not place credentials, private memory, account identifiers, working exploits, or another user's local paths in a public issue.
 
-Include the affected version, operating system, Codex version, reproduction steps, and the smallest redacted diagnostic sample that demonstrates the problem. Never attach a TMCRA token file, provider key, memory database, prompt transcript, or integration state directory.
+Revoke any exposed TMCRA credential immediately. Include only the affected plugin, Codex or Claude Code version, operating system, reproduction steps, and the smallest redacted diagnostic sample.
 
-## Intended security boundary
+## Security boundary
 
-- The plugin accepts only exact loopback TMCRA API destinations.
-- Bearer tokens remain in owner-only files and are read at request time.
-- Recalled memory is labelled as untrusted data before injection.
-- User and assistant records remain role-separated and source-attributed.
-- Hook failures are fail-open for Codex and write only bounded, content-free diagnostics.
-- The plugin never contacts a TMCRA account service or hosted TMCRA endpoint.
+- Production API origins require HTTPS; explicit localhost endpoints are accepted for development and tests.
+- Normal installation uses browser device authorization and writes the scoped credential to a protected local configuration file.
+- Credentials, device codes, PKCE verifiers, delivery receipts, private keys, verification codes, developer instructions, and chain-of-thought are excluded from memory and logs.
+- Recalled material is marked as untrusted evidence. Current user instructions retain higher authority.
+- Automatic lifecycle hooks use short timeouts and fail open so a memory-service outage cannot block the host Agent.
+- User, assistant, tool, session, project, and Agent provenance remain distinct.
 
-The TMCRA runtime, model providers, operating-system backups, and any separately installed integrations have their own security boundaries.
+The hosted TMCRA service, account console, deployment infrastructure, and other integrations have their own security boundaries.

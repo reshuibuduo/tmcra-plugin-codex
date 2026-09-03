@@ -1,7 +1,7 @@
-TMCRA Local Memory for Codex
+TMCRA Memory for Codex and Claude Code
 Copyright 2026 Yu Haoxin and TMCRA contributors
 
 Development and release-validation assistance was provided by OpenAI Codex.
 
-This repository contains the Codex integration layer derived from
-TMCRA Agent Memory: https://github.com/reshuibuduo/TMCRA-Agent-Memory
+This repository contains the Codex and Claude Code integration layer for
+TMCRA: https://github.com/reshuibuduo/tmcra
