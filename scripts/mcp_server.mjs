@@ -23,12 +23,18 @@ import {
   waitJob,
   wrapUntrustedMemory,
 } from "./tmcra_client.mjs";
+import {
+  publicProviderConfig,
+  readProviderConfig,
+} from "./provider_config.mjs";
+import { startProviderSetupServer } from "./provider_setup.mjs";
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INTEGRATION_LABEL = clientPlatform() === "claude-code" ? "Claude Code" : "Codex";
 const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 const STATUS_WIDGET_URI = "ui://tmcra/memory-status-v1.html";
 const RECALL_WIDGET_URI = "ui://tmcra/recall-inspector-v1.html";
+let providerSetup = null;
 const RESOURCES = [
   {
     uri: STATUS_WIDGET_URI,
@@ -49,6 +55,16 @@ const RESOURCES = [
 ];
 
 const TOOLS = [
+  {
+    name: "tmcra_open_local_model_settings",
+    description:
+      "Open the loopback-only TMCRA model settings page. Writer and background-organizer API credentials remain in the local user configuration and are never returned to the model.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {},
+    },
+  },
   {
     name: "tmcra_status",
     description:
@@ -754,6 +770,45 @@ async function safeCaptureStatus() {
   }
 }
 
+async function safeProviderStatus() {
+  try {
+    return publicProviderConfig(await readProviderConfig());
+  } catch (error) {
+    return {
+      schemaVersion: 1,
+      execution: "local",
+      configured: false,
+      error: publicText(error instanceof Error ? error.message : "provider configuration is unreadable", 240),
+    };
+  }
+}
+
+async function openProviderSettings() {
+  if (providerSetup?.server?.listening) {
+    if (!providerSetup.openPage()) throw new Error("browser launch failed");
+    return {
+      ok: true,
+      alreadyOpen: true,
+      browserOpened: true,
+      storage: "local-user-config",
+      credentialValuesExposed: false,
+    };
+  }
+  providerSetup = await startProviderSetupServer({ open: true });
+  providerSetup.server.once("close", () => { providerSetup = null; });
+  if (!providerSetup.opened) {
+    providerSetup.server.close();
+    providerSetup = null;
+    throw new Error("browser launch failed; run scripts/provider_setup.mjs from the installed TMCRA plugin directory");
+  }
+  return {
+    ok: true,
+    browserOpened: true,
+    storage: "local-user-config",
+    credentialValuesExposed: false,
+  };
+}
+
 async function toolStatus(args = {}) {
   let stage = "load_config";
   try {
@@ -772,8 +827,9 @@ async function toolStatus(args = {}) {
     safeCaptureStatus(),
     scopes ? safeRecoveryOne(scopes.globalScope, config) : unavailableRecovery(),
     scopes ? safeRecoveryOne(scopes.projectScope, config) : unavailableRecovery(),
+    safeProviderStatus(),
   ]);
-  const [session, lifecycle, capture, globalRecovery, projectRecovery] = statusParts;
+  const [session, lifecycle, capture, globalRecovery, projectRecovery, localProviders] = statusParts;
   stage = "summarize";
   const recovery = recoverySummary(globalRecovery, projectRecovery);
   const value = {
@@ -792,6 +848,7 @@ async function toolStatus(args = {}) {
     lifecycle,
     capture,
     recovery,
+    localProviders,
     nextAction: capture.failedCount > 0
       ? `${capture.failedCount} captured turn(s) reached a failed remote terminal state. Automatic replay is stopped; inspect and retry through the supported recovery flow.`
       : !session.serviceOnline
@@ -816,6 +873,7 @@ async function toolStatus(args = {}) {
 }
 
 async function callTool(name, args) {
+  if (name === "tmcra_open_local_model_settings") return openProviderSettings();
   if (name === "tmcra_status") return toolStatus(args);
   if (name === "tmcra_recall") return toolRecall(args);
   if (name === "tmcra_last_recall") return toolLastRecall(args);

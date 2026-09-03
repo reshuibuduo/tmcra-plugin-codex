@@ -90,6 +90,14 @@ This is a repository snapshot, not reconstructed conversation history.
 
 ## Configuration
 
+### Local Writer and background organizer
+
+Ask Codex **“Open TMCRA local model settings”** to open the setup page. The MCP response contains no credential value or setup-session token. The page is served from a temporary random-token session bound to `127.0.0.1`, and it supports separate Writer and background-organizer providers or one shared provider.
+
+Provider settings are shared by the Codex and DeepSeek Harness plugins in `~/.config/tmcra/local-providers.json`. API keys stay in that local user file and are sent only to the provider endpoint while testing a connection. A changed Provider or Base URL requires the key to be entered again, preventing a saved key from being forwarded to another endpoint. The file uses mode `0600` on macOS/Linux; on Windows it removes inherited ACLs and grants access only to the current user and SYSTEM. Any process running as that user can potentially read the file, so use this feature only on a trusted local account.
+
+This release provides the local settings, validation, redacted status, and connection test. The production ingest and consolidation jobs continue to use the existing TMCRA service pipeline; local Writer and organizer execution begins when the client task protocol is connected.
+
 The default configuration file is `~/.config/tmcra/config.json`. Environment variables override it:
 
 - `TMCRA_ACCESS_TOKEN`

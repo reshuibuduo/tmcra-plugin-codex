@@ -1,6 +1,6 @@
 {
   "name": "tmcra-memory",
-  "version": "0.3.0-rc.6",
+  "version": "0.3.0-rc.7",
   "description": "Automatic long-term memory recall and capture for Codex.",
   "author": {
     "name": "TMCRA",
@@ -19,7 +19,7 @@
   "interface": {
     "displayName": "TMCRA Memory",
     "shortDescription": "Automatic long-term memory for coding agents.",
-    "longDescription": "Recall relevant TMCRA memory before Codex answers, capture completed turns, and preserve long-running tasks across automatic context compaction with redacted tool-progress checkpoints. Includes explicit MCP tools for inspecting recall, ingestion, jobs, and runtime status.",
+    "longDescription": "Recall relevant TMCRA memory before Codex answers, capture completed turns, and preserve long-running tasks across automatic context compaction with redacted tool-progress checkpoints. Includes explicit MCP tools for inspecting recall, ingestion, jobs, runtime status, and local model-provider settings.",
     "developerName": "TMCRA",
     "category": "Productivity",
     "capabilities": [
@@ -32,7 +32,8 @@
       "Show which TMCRA memories are relevant to this task.",
       "Remember this decision for future coding sessions.",
       "Check whether the latest TMCRA memory write completed.",
-      "Show TMCRA installation and lifecycle status."
+      "Show TMCRA installation and lifecycle status.",
+      "Open TMCRA local Writer and background-organizer settings."
     ],
     "brandColor": "#49E5C2"
   },

@@ -42,6 +42,14 @@ sh ./install.sh
 - 凭据、私钥、验证码、开发者指令和 chain-of-thought 不会进入记忆。
 - 旧 Codex 历史与仓库基线只能先本地预览，再由用户明确确认导入。
 
+## 本地 Writer 与后台整理模型
+
+在 Codex 中输入“打开 TMCRA 本地模型设置”即可打开配置页。MCP 返回结果不含 API Key 和页面会话令牌。配置页只监听 `127.0.0.1`，每次启动生成随机令牌；Writer 与后台整理可以共用模型，也可以分别填写 Provider、Base URL、模型名称和 API Key。
+
+Codex 与 DeepSeek Harness 共用 `~/.config/tmcra/local-providers.json`。API Key 只保存在当前系统用户的本地文件中，测试连接时只发往用户填写的模型服务。Provider 或 Base URL 改变后必须重新填写 Key，已保存的 Key 不会转发到新地址。macOS/Linux 使用 `0600` 权限；Windows 移除继承 ACL，只授权当前用户与 SYSTEM。同一系统用户运行的其他进程仍可能读取该文件，因此这项功能适合可信的本地账号。
+
+此版本完成本地配置、校验、脱敏状态和连接测试。生产写入与整理任务继续使用现有 TMCRA 服务端链路；客户端任务协议接通后，本地 Writer 和后台整理执行器才能实际接管这些任务。
+
 ## 开发验证
 
 ```sh

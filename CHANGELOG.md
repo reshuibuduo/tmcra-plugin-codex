@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-rc.7 - 2026-09-04
+
+- Add a loopback-only local settings UI for separate Writer and background-organizer model providers.
+- Keep provider credentials in the local user configuration and redact them from every MCP response.
+- Prevent a saved credential from being reused after its provider or Base URL changes.
+
 ## 0.3.0-rc.6 - 2026-09-04
 
 - Canonicalize ZIP creator and file-mode metadata so Windows and Linux now produce the same archive and SHA-256 digest.

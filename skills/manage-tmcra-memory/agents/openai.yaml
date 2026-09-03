@@ -1,4 +1,4 @@
 interface:
   display_name: "Manage TMCRA Memory"
   short_description: "Connect, recall, store, and inspect TMCRA memory"
-  default_prompt: "Use $manage-tmcra-memory to show the memory used for the latest completed answer or manage TMCRA memory for this task."
+  default_prompt: "Use $manage-tmcra-memory to inspect or manage TMCRA memory, including local Writer and background-organizer settings."

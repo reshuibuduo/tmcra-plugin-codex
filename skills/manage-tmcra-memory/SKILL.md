@@ -1,6 +1,6 @@
 ---
 name: manage-tmcra-memory
-description: Manage and troubleshoot TMCRA long-term memory through the bundled MCP tools and Codex device authorization. Use when a user explicitly asks to remember, recall, inspect, verify, or wait for memory; asks why a memory was used; asks to persist an important project decision; or needs to connect or reauthorize the installed Codex plugin.
+description: Manage and troubleshoot TMCRA long-term memory through the bundled MCP tools and Codex device authorization. Use when a user explicitly asks to remember, recall, inspect, verify, or wait for memory; configure local Writer or organizer providers; asks why a memory was used; asks to persist an important project decision; or needs to connect or reauthorize the installed Codex plugin.
 ---
 
 # Manage TMCRA Memory
@@ -45,6 +45,13 @@ Automatic recall and capture are handled by lifecycle hooks. Use this skill for 
 - Distinguish file installation from observed lifecycle execution. Ready requires current-version SessionStart, recall, and capture events.
 - If lifecycle events are missing, tell the user to confirm `TMCRA Memory` is enabled in the Codex Desktop Plugins page, run `/hooks`, trust all nine TMCRA hooks (`SessionStart`, `SubagentStart`, `UserPromptSubmit`, `PostToolUse`, `PreCompact`, `PostCompact`, `Stop`, `StopFailure`, and `SubagentStop`), and complete one turn in a new task.
 - Do not claim that an installer trusted hooks. Codex requires explicit user review and does not permit silent Hook trust.
+
+## Configure local model providers
+
+- Call `tmcra_open_local_model_settings` when the user asks to configure the local Writer or background-organizer model provider.
+- The tool opens a temporary loopback page and returns no API Key or setup-session token. Never ask the user to paste a provider key into chat.
+- A successful connection test verifies the configured `/models` endpoint. It does not prove that production memory jobs have moved to local execution.
+- The current release stores and validates local provider settings. Do not claim that ingest or consolidation consumes them until the client task protocol and executor are connected.
 
 ## User controls
 

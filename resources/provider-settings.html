@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TMCRA 本地模型配置</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07110f;
+      --panel: #0d1b18;
+      --panel-2: #12231f;
+      --line: #294039;
+      --text: #edf8f4;
+      --muted: #9bb6ad;
+      --mint: #49e5c2;
+      --mint-ink: #03251d;
+      --danger: #ff8c8c;
+      --warning: #ffd47a;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(73, 229, 194, .11), transparent 34rem),
+        linear-gradient(160deg, #07110f 0%, #081310 55%, #050b09 100%);
+      color: var(--text);
+    }
+    main { width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: 56px 0 72px; }
+    header { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; margin-bottom: 32px; }
+    .eyebrow { margin: 0 0 10px; color: var(--mint); font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .16em; }
+    h1 { margin: 0; max-width: 720px; font-size: clamp(32px, 6vw, 58px); line-height: .98; letter-spacing: -.045em; }
+    .lead { max-width: 700px; margin: 18px 0 0; color: var(--muted); font-size: 16px; line-height: 1.7; }
+    .local-badge { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #37665a; border-radius: 999px; background: rgba(73, 229, 194, .08); color: #b9fff0; font-size: 12px; white-space: nowrap; }
+    .local-badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 14px var(--mint); }
+    .notice { display: grid; grid-template-columns: auto 1fr; gap: 14px; margin-bottom: 22px; padding: 16px 18px; border: 1px solid #355047; background: rgba(18, 35, 31, .74); border-radius: 16px; }
+    .notice b { color: var(--mint); }
+    .notice p { margin: 0; color: var(--muted); line-height: 1.6; }
+    form { display: grid; gap: 18px; }
+    .card { border: 1px solid var(--line); border-radius: 20px; background: rgba(13, 27, 24, .91); box-shadow: 0 20px 80px rgba(0, 0, 0, .22); overflow: hidden; }
+    .card-head { display: flex; justify-content: space-between; gap: 20px; padding: 22px 24px 18px; border-bottom: 1px solid var(--line); }
+    .card-head span { color: var(--mint); font: 700 12px/1 ui-monospace, monospace; letter-spacing: .12em; }
+    h2 { margin: 5px 0 0; font-size: 23px; letter-spacing: -.02em; }
+    .card-head p { max-width: 460px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; text-align: right; }
+    .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 22px 24px 24px; }
+    label { display: grid; gap: 8px; color: #cce0da; font-size: 13px; font-weight: 650; }
+    label.wide { grid-column: 1 / -1; }
+    input, select {
+      width: 100%; min-height: 45px; padding: 10px 12px; border: 1px solid #3a554d; border-radius: 10px;
+      background: #08130f; color: var(--text); font: 500 14px/1.3 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(73, 229, 194, .12); }
+    input::placeholder { color: #668078; }
+    small { color: #77948b; font-weight: 450; line-height: 1.45; }
+    .check { display: flex; align-items: center; gap: 10px; grid-column: 1 / -1; padding: 13px 14px; border: 1px solid #314940; border-radius: 12px; background: #0a1713; }
+    .check input { width: 18px; min-height: 18px; margin: 0; accent-color: var(--mint); }
+    .check span { display: grid; gap: 3px; }
+    .check b { color: var(--text); font-size: 14px; }
+    .check small { color: var(--muted); }
+    .stage-actions { display: flex; align-items: center; gap: 12px; grid-column: 1 / -1; }
+    button { min-height: 42px; padding: 9px 15px; border: 1px solid #48655c; border-radius: 10px; background: #12251f; color: var(--text); font-weight: 750; cursor: pointer; }
+    button:hover { border-color: var(--mint); }
+    button:disabled { cursor: wait; opacity: .55; }
+    button.primary { border-color: var(--mint); background: var(--mint); color: var(--mint-ink); }
+    button.quiet { background: transparent; }
+    button.danger { border-color: #694747; color: #ffb4b4; background: #241515; }
+    .test-state { color: var(--muted); font-size: 13px; }
+    .test-state.good { color: var(--mint); }
+    .test-state.bad { color: var(--danger); }
+    .footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 16px; border: 1px solid #3b554d; border-radius: 16px; background: rgba(7, 17, 15, .94); box-shadow: 0 18px 50px rgba(0, 0, 0, .4); }
+    #status { color: var(--muted); font-size: 13px; line-height: 1.4; }
+    #status.good { color: var(--mint); }
+    #status.bad { color: var(--danger); }
+    .footer-actions { display: flex; gap: 10px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 700px) {
+      main { width: min(100% - 20px, 960px); padding-top: 28px; }
+      header { grid-template-columns: 1fr; }
+      .local-badge { justify-self: start; }
+      .card-head { display: grid; }
+      .card-head p { text-align: left; }
+      .fields { grid-template-columns: 1fr; padding: 18px; }
+      label.wide, .check, .stage-actions { grid-column: auto; }
+      .footer { align-items: stretch; flex-direction: column; }
+      .footer-actions { display: grid; grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">TMCRA / LOCAL PROVIDERS</p>
+        <h1>配置本机记忆模型</h1>
+        <p class="lead">为即时 Writer 与后台整理分别选择模型。API Key 只写入当前系统用户的本地配置文件，测试连接时仅发送给你填写的模型服务。</p>
+      </div>
+      <div class="local-badge">仅在 127.0.0.1 运行</div>
+    </header>
+
+    <div class="notice">
+      <b>本机边界</b>
+      <p>TMCRA 云端、Codex 对话和 DeepSeek Harness 配置都不会收到模型 API Key。这些设置保存在本机，供后续接入的本地 Writer 与后台整理执行器读取。</p>
+    </div>
+
+    <form id="settings">
+      <section class="card">
+        <div class="card-head">
+          <div><span>01 / FAST WRITE</span><h2>Writer API</h2></div>
+          <p>每轮对话结束后提取事实、决定、任务状态和来源关系。建议选择响应稳定、结构化输出可靠的模型。</p>
+        </div>
+        <div class="fields" data-stage="writer">
+          <label>Provider
+            <select name="writer.provider">
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai-compatible">OpenAI-compatible</option>
+              <option value="local-openai-compatible">本地 OpenAI-compatible</option>
+            </select>
+          </label>
+          <label>模型名称
+            <input name="writer.model" required maxlength="512" placeholder="deepseek-chat">
+          </label>
+          <label class="wide">Base URL
+            <input name="writer.baseUrl" required maxlength="2048" inputmode="url" spellcheck="false" placeholder="https://api.deepseek.com/v1">
+            <small>远程地址使用 HTTPS；本机 localhost / 127.0.0.1 / ::1 可以使用 HTTP。</small>
+          </label>
+          <label class="wide">API Key
+            <input name="writer.apiKey" type="password" maxlength="4096" autocomplete="new-password" spellcheck="false" placeholder="填写 API Key">
+            <small data-secret-note="writer">保存后不会再次显示明文。</small>
+          </label>
+          <div class="stage-actions">
+            <button type="button" data-test="writer">测试 Writer 连接</button>
+            <button type="button" class="danger" data-clear="writer" hidden>清除 Writer Key</button>
+            <span class="test-state" data-test-state="writer"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div><span>02 / BACKGROUND</span><h2>后台整理 API</h2></div>
+          <p>批量合并长期记忆、处理冲突和构建 Slow Graph。可以复用 Writer，也可以单独使用更强模型。</p>
+        </div>
+        <div class="fields" data-stage="organizer">
+          <label class="check">
+            <input name="organizer.inheritWriter" type="checkbox" checked>
+            <span><b>复用 Writer 配置</b><small>适合先跑通；需要更高质量时再拆分独立模型。</small></span>
+          </label>
+          <div id="organizer-fields" style="display: contents">
+            <label>Provider
+              <select name="organizer.provider">
+                <option value="deepseek">DeepSeek</option>
+                <option value="openai-compatible">OpenAI-compatible</option>
+                <option value="local-openai-compatible">本地 OpenAI-compatible</option>
+              </select>
+            </label>
+            <label>模型名称
+              <input name="organizer.model" maxlength="512" placeholder="deepseek-reasoner">
+            </label>
+            <label class="wide">Base URL
+              <input name="organizer.baseUrl" maxlength="2048" inputmode="url" spellcheck="false" placeholder="https://api.deepseek.com/v1">
+            </label>
+            <label class="wide">API Key
+              <input name="organizer.apiKey" type="password" maxlength="4096" autocomplete="new-password" spellcheck="false" placeholder="填写 API Key">
+              <small data-secret-note="organizer">保存后不会再次显示明文。</small>
+            </label>
+          </div>
+          <div class="stage-actions">
+            <button type="button" data-test="organizer">测试后台整理连接</button>
+            <button type="button" class="danger" data-clear="organizer" hidden>清除后台整理 Key</button>
+            <span class="test-state" data-test-state="organizer"></span>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer">
+        <span id="status">正在读取本机配置…</span>
+        <div class="footer-actions">
+          <button type="button" class="quiet" id="close">关闭</button>
+          <button type="submit" class="primary" id="save">保存到本机</button>
+        </div>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    const fragmentToken = decodeURIComponent(location.hash.slice(1));
+    if (fragmentToken) sessionStorage.setItem("tmcra.setup.token", fragmentToken);
+    const token = fragmentToken || sessionStorage.getItem("tmcra.setup.token") || "";
+    history.replaceState(null, "", location.pathname);
+    const form = document.querySelector("#settings");
+    const status = document.querySelector("#status");
+    const saveButton = document.querySelector("#save");
+    const inherit = form.elements.namedItem("organizer.inheritWriter");
+    const organizerFields = document.querySelector("#organizer-fields");
+    let current = null;
+
+    function setStatus(text, kind = "") {
+      status.textContent = text;
+      status.className = kind;
+    }
+
+    async function request(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {
+          "X-TMCRA-Setup-Token": token,
+          ...(options.body ? { "Content-Type": "application/json" } : {}),
+          ...(options.headers || {}),
+        },
+      });
+      const payload = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      return payload;
+    }
+
+    function setValue(name, value) {
+      const control = form.elements.namedItem(name);
+      if (control) control.value = value || "";
+    }
+
+    function updateSecret(stage, present) {
+      const note = document.querySelector(`[data-secret-note="${stage}"]`);
+      const clear = document.querySelector(`[data-clear="${stage}"]`);
+      note.textContent = present ? "已保存本机 Key；留空会继续使用，页面不会读取明文。" : "保存后不会再次显示明文。";
+      clear.hidden = !present;
+    }
+
+    function applyConfig(config) {
+      current = config;
+      if (config.writer) {
+        setValue("writer.provider", config.writer.provider);
+        setValue("writer.baseUrl", config.writer.baseUrl);
+        setValue("writer.model", config.writer.model);
+        updateSecret("writer", config.writer.credentialPresent);
+      } else {
+        setValue("writer.provider", "deepseek");
+        setValue("writer.baseUrl", "https://api.deepseek.com/v1");
+        setValue("writer.model", "deepseek-chat");
+        updateSecret("writer", false);
+      }
+      inherit.checked = config.organizer?.inheritWriter !== false;
+      if (!inherit.checked) {
+        setValue("organizer.provider", config.organizer.provider);
+        setValue("organizer.baseUrl", config.organizer.baseUrl);
+        setValue("organizer.model", config.organizer.model);
+      } else {
+        setValue("organizer.provider", "deepseek");
+        setValue("organizer.baseUrl", "https://api.deepseek.com/v1");
+        setValue("organizer.model", "deepseek-reasoner");
+      }
+      updateSecret("organizer", !inherit.checked && Boolean(config.organizer?.credentialPresent));
+      syncOrganizer();
+    }
+
+    function syncOrganizer() {
+      const disabled = inherit.checked;
+      organizerFields.querySelectorAll("input, select").forEach((control) => { control.disabled = disabled; });
+      organizerFields.style.opacity = disabled ? ".42" : "1";
+      document.querySelector('[data-clear="organizer"]').hidden = disabled || !current?.organizer?.credentialPresent;
+    }
+
+    function stageValue(stage) {
+      const get = (name) => form.elements.namedItem(`${stage}.${name}`).value.trim();
+      return {
+        provider: get("provider"),
+        baseUrl: get("baseUrl"),
+        model: get("model"),
+        apiKey: get("apiKey"),
+      };
+    }
+
+    function configValue() {
+      return {
+        writer: stageValue("writer"),
+        organizer: inherit.checked
+          ? { inheritWriter: true }
+          : { inheritWriter: false, ...stageValue("organizer") },
+      };
+    }
+
+    inherit.addEventListener("change", syncOrganizer);
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      saveButton.disabled = true;
+      setStatus("正在安全写入本机配置…");
+      try {
+        const result = await request("/api/config", { method: "PUT", body: JSON.stringify(configValue()) });
+        form.elements.namedItem("writer.apiKey").value = "";
+        form.elements.namedItem("organizer.apiKey").value = "";
+        applyConfig(result.config);
+        setStatus("配置已保存；API Key 保留在本机。", "good");
+      } catch (error) {
+        setStatus(error.message, "bad");
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
+
+    document.querySelectorAll("[data-test]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const stage = button.dataset.test;
+        const state = document.querySelector(`[data-test-state="${stage}"]`);
+        button.disabled = true;
+        state.className = "test-state";
+        state.textContent = "正在连接…";
+        try {
+          const result = await request("/api/test", {
+            method: "POST",
+            body: JSON.stringify({ stage, config: configValue() }),
+          });
+          state.className = "test-state good";
+          state.textContent = result.modelVisible === false
+            ? `连接成功（${result.latencyMs} ms），模型列表中未找到该名称`
+            : `连接成功 · ${result.latencyMs} ms`;
+        } catch (error) {
+          state.className = "test-state bad";
+          state.textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-clear]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const stage = button.dataset.clear;
+        if (!confirm(`清除本机保存的 ${stage === "writer" ? "Writer" : "后台整理"} API Key？`)) return;
+        try {
+          const result = await request(`/api/credentials/${encodeURIComponent(stage)}`, { method: "DELETE" });
+          applyConfig(result.config);
+          setStatus("本机 API Key 已清除。", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      });
+    });
+
+    document.querySelector("#close").addEventListener("click", async () => {
+      try { await request("/api/close", { method: "POST" }); } catch {}
+      sessionStorage.removeItem("tmcra.setup.token");
+      document.body.innerHTML = '<main><p class="eyebrow">TMCRA / COMPLETE</p><h1>配置页已关闭</h1><p class="lead">可以安全关闭这个浏览器标签。</p></main>';
+    });
+
+    request("/api/config")
+      .then(({ config, configPath }) => {
+        applyConfig(config);
+        setStatus(`本机配置文件：${configPath}`);
+      })
+      .catch((error) => setStatus(error.message, "bad"));
+  </script>
+</body>
+</html>
