@@ -1,0 +1,4 @@
+[scanner]
+# Mock tests intentionally contain token-shaped sentinel values to verify
+# redaction. They are development fixtures and are excluded from releases.
+ignore_paths = ["tests/*"]

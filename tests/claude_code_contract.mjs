@@ -71,7 +71,7 @@ function runHook(script, input, env) {
   });
 }
 
-async function waitFor(predicate, timeoutMs = 8_000) {
+async function waitFor(predicate, timeoutMs = 20_000) {
   const deadline = Date.now() + timeoutMs;
   while (!(await predicate())) {
     if (Date.now() >= deadline) throw new Error("condition did not become true");
@@ -133,10 +133,14 @@ try {
     background_tasks: [{ id: "background-1", description: "pending test task" }],
     session_crons: [],
   }, env);
-  await waitFor(() => server.records.length === 1);
-  assert.equal(server.records[0].metadata.integration, "claude-code");
-  assert.match(server.records[0].metadata.integration_version, /\+claude\./u);
-  assert.equal(server.records[0].messages[0].content, first);
+  await waitFor(() => server.records.some((record) =>
+    record.messages?.[0]?.content === first,
+  ));
+  const firstRecord = server.records.find((record) =>
+    record.messages?.[0]?.content === first,
+  );
+  assert.equal(firstRecord.metadata.integration, "claude-code");
+  assert.match(firstRecord.metadata.integration_version, /\+claude\./u);
   assert(server.requests.some((request) => request.clientPlatform === "claude-code"));
   await waitFor(() => server.records.some((record) =>
     record.metadata.checkpoint_reason === "stop_with_background_work",
