@@ -1,6 +1,6 @@
 {
   "name": "tmcra-memory-codex-plugin",
-  "version": "0.3.0-rc.7",
+  "version": "0.3.0-rc.8",
   "private": true,
   "description": "Automatic TMCRA long-term memory for Codex and Claude Code",
   "type": "module",
@@ -12,7 +12,7 @@
     "test:claude": "node tests/claude_code_contract.mjs",
     "test:provider-setup": "node tests/provider_setup_contract.mjs",
     "build:release": "pwsh -NoProfile -File scripts/build_release.ps1",
-    "verify": "node --check hooks/run_hook.mjs && node --check hooks/claude_run_hook.mjs && node --check scripts/tmcra_client.mjs && node --check scripts/provider_config.mjs && node --check scripts/provider_setup.mjs && npm run test:provider-setup && npm test"
+    "verify": "node --check hooks/run_hook.mjs && node --check hooks/claude_run_hook.mjs && node --check scripts/tmcra_client.mjs && node --check scripts/provider_config.mjs && node --check scripts/provider_setup.mjs && node --check scripts/provider_executor.mjs && npm run test:provider-setup && npm test"
   },
   "repository": {
     "type": "git",

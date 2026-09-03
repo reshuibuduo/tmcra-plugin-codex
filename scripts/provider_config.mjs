@@ -50,7 +50,7 @@ function boundedText(value, field, { required = true, maximum = MAX_TEXT_LENGTH 
   return normalized;
 }
 
-function loopbackHost(hostname) {
+export function loopbackHost(hostname) {
   return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname.toLowerCase());
 }
 
@@ -220,12 +220,17 @@ export async function clearProviderCredential(stage, path = resolveProviderConfi
   }, path);
 }
 
-function resolvedStage(config, stage) {
+export function resolvedProviderStage(config, stage) {
   if (stage === "writer") return config.writer;
   if (stage === "organizer") {
     return config.organizer.inheritWriter ? config.writer : config.organizer;
   }
   throw new Error("provider stage is unsupported");
+}
+
+export function providerStageReady(config, stage) {
+  const target = resolvedProviderStage(config, stage);
+  return Boolean(target && (target.apiKey || loopbackHost(new URL(target.baseUrl).hostname)));
 }
 
 export async function probeProvider(stage, input, {
@@ -235,7 +240,7 @@ export async function probeProvider(stage, input, {
 } = {}) {
   const previous = await readProviderConfig(path);
   const normalized = normalizeProviderConfig(input, previous ?? undefined);
-  const target = resolvedStage(normalized, stage);
+  const target = resolvedProviderStage(normalized, stage);
   if (!target.apiKey && !loopbackHost(new URL(target.baseUrl).hostname)) {
     throw new Error(`${stage} API key is required for a remote provider`);
   }

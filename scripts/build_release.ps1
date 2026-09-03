@@ -55,6 +55,7 @@ $releaseFiles = @(
     [ordered]@{ Source = "scripts/project_bootstrap.mjs"; Archive = "plugins/tmcra-memory/scripts/project_bootstrap.mjs" },
     [ordered]@{ Source = "scripts/project_init.mjs"; Archive = "plugins/tmcra-memory/scripts/project_init.mjs" },
     [ordered]@{ Source = "scripts/provider_config.mjs"; Archive = "plugins/tmcra-memory/scripts/provider_config.mjs" },
+    [ordered]@{ Source = "scripts/provider_executor.mjs"; Archive = "plugins/tmcra-memory/scripts/provider_executor.mjs" },
     [ordered]@{ Source = "scripts/provider_setup.mjs"; Archive = "plugins/tmcra-memory/scripts/provider_setup.mjs" },
     [ordered]@{ Source = "scripts/tmcra_client.mjs"; Archive = "plugins/tmcra-memory/scripts/tmcra_client.mjs" },
     [ordered]@{ Source = "resources/provider-settings.html"; Archive = "plugins/tmcra-memory/resources/provider-settings.html" },

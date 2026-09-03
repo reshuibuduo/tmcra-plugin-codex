@@ -96,7 +96,7 @@ Ask Codex **“Open TMCRA local model settings”** to open the setup page. The 
 
 Provider settings are shared by the Codex and DeepSeek Harness plugins in `~/.config/tmcra/local-providers.json`. API keys stay in that local user file and are sent only to the provider endpoint while testing a connection. A changed Provider or Base URL requires the key to be entered again, preventing a saved key from being forwarded to another endpoint. The file uses mode `0600` on macOS/Linux; on Windows it removes inherited ACLs and grants access only to the current user and SYSTEM. Any process running as that user can potentially read the file, so use this feature only on a trusted local account.
 
-This release provides the local settings, validation, redacted status, and connection test. The production ingest and consolidation jobs continue to use the existing TMCRA service pipeline; local Writer and organizer execution begins when the client task protocol is connected.
+The saved configuration is active while the Codex MCP process is running. Ingest requests route Writer work, including a forced slow stage, to the authenticated local executor. `tmcra_consolidate` routes an explicit background-organizer job the same way. The executor leases only tasks created with the current device credential, calls the configured OpenAI-compatible endpoint, and returns the parsed JSON result, normalized token usage, and provider request ID. Provider keys and raw provider response envelopes stay in the current user's local process.
 
 The default configuration file is `~/.config/tmcra/config.json`. Environment variables override it:
 

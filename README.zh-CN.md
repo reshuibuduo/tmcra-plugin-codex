@@ -48,7 +48,7 @@ sh ./install.sh
 
 Codex 与 DeepSeek Harness 共用 `~/.config/tmcra/local-providers.json`。API Key 只保存在当前系统用户的本地文件中，测试连接时只发往用户填写的模型服务。Provider 或 Base URL 改变后必须重新填写 Key，已保存的 Key 不会转发到新地址。macOS/Linux 使用 `0600` 权限；Windows 移除继承 ACL，只授权当前用户与 SYSTEM。同一系统用户运行的其他进程仍可能读取该文件，因此这项功能适合可信的本地账号。
 
-此版本完成本地配置、校验、脱敏状态和连接测试。生产写入与整理任务继续使用现有 TMCRA 服务端链路；客户端任务协议接通后，本地 Writer 和后台整理执行器才能实际接管这些任务。
+保存后的配置会在 Codex MCP 进程运行期间生效。写入请求会把 Writer 工作（包括强制慢阶段）路由到已认证的本机执行器；`tmcra_consolidate` 会用同一路径处理显式后台整理任务。执行器只领取由当前设备凭据创建的任务，调用用户配置的 OpenAI 兼容端点，并回传解析后的 JSON、标准化 Token 用量和服务商请求 ID。API Key 与服务商原始响应包保留在当前用户的本机进程中。
 
 ## 开发验证
 

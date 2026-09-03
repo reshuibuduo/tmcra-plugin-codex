@@ -5,6 +5,11 @@ import { homedir } from "node:os";
 import { basename, dirname, join, parse, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  providerStageReady,
+  readProviderConfig,
+} from "./provider_config.mjs";
+
 const DEFAULT_BASE_URL = "https://api.tmcra.com";
 const DEFAULT_SCOPE_NAMESPACE = "tmcra";
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -346,6 +351,18 @@ function encodedScope(scope) {
   return encodeURIComponent(scope);
 }
 
+async function localProviderExecutionHeaders(stage) {
+  try {
+    const local = await readProviderConfig();
+    if (!local || !providerStageReady(local, stage)) return {};
+    return stage === "writer"
+      ? { "X-TMCRA-Writer-Execution": "user-provider" }
+      : { "X-TMCRA-Organizer-Execution": "user-provider" };
+  } catch {
+    return {};
+  }
+}
+
 export async function getSession(config, { attempts = 2 } = {}) {
   return request("/v1/session", { config, attempts });
 }
@@ -403,11 +420,19 @@ export async function ingest({
     slow_policy: slowPolicy,
     metadata: metadata || {},
   };
+  const [writerProviderHeaders, organizerProviderHeaders] = await Promise.all([
+    localProviderExecutionHeaders("writer"),
+    localProviderExecutionHeaders("organizer"),
+  ]);
   return request(`/v1/scopes/${encodedScope(scope)}/ingest`, {
     method: "POST",
     config: resolved,
     attempts,
-    headers: { "Idempotency-Key": idempotencyKey || deterministicKey({ scope, body }) },
+    headers: {
+      "Idempotency-Key": idempotencyKey || deterministicKey({ scope, body }),
+      ...writerProviderHeaders,
+      ...organizerProviderHeaders,
+    },
     body,
   });
 }
@@ -430,12 +455,14 @@ export async function retryJob(jobId, { idempotencyKey, config } = {}) {
 
 export async function consolidate({ scope, idempotencyKey, config } = {}) {
   if (!scope) throw new Error("scope is required for consolidation");
+  const providerHeaders = await localProviderExecutionHeaders("organizer");
   return request(`/v1/scopes/${encodedScope(scope)}/consolidate`, {
     method: "POST",
     config,
     attempts: 1,
     headers: {
       "Idempotency-Key": idempotencyKey || deterministicKey({ action: "consolidate", scope }),
+      ...providerHeaders,
     },
   });
 }

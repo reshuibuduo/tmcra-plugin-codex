@@ -18,6 +18,7 @@ import {
   sortOutboxEntries,
   submitOutboxTurn,
 } from "./tmcra_client.mjs";
+import { executeAvailableProviderTasks } from "./provider_executor.mjs";
 
 const LOCK_STALE_MS = 5 * 60 * 1000;
 const LOCK_HEARTBEAT_MS = 30 * 1000;
@@ -105,9 +106,23 @@ async function drain() {
     void utimes(lockPath, now, now).catch(() => {});
   }, LOCK_HEARTBEAT_MS);
   let consecutiveTransientFailures = 0;
+  let providerExecutorErrorLogged = false;
   try {
     const config = await loadConfig();
     for (;;) {
+      try {
+        await executeAvailableProviderTasks({ config, maxTasks: MAX_IN_FLIGHT_JOBS });
+        providerExecutorErrorLogged = false;
+      } catch (error) {
+        if (!providerExecutorErrorLogged) {
+          providerExecutorErrorLogged = true;
+          await appendLog("local_provider_executor_unavailable", {
+            status: error?.status || null,
+            code: error?.code || null,
+            requestId: error?.requestId || null,
+          });
+        }
+      }
       let entries = await listOutboxTurns();
       if (!entries.length) {
         if (await hasDrainRequest()) {

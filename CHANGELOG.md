@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0-rc.8 - 2026-09-04
+
+- Execute configured Writer and background-organizer calls from the authenticated local Codex process.
+- Add a durable, credential-bound task lease protocol with heartbeat and idempotent terminal receipts.
+- Return only parsed JSON, normalized usage, and provider request identity to TMCRA; keep API keys and raw provider envelopes local.
+- Add explicit `tmcra_consolidate` routing, bounded response handling, fair stage scheduling, and quiet exponential recovery.
+
 ## 0.3.0-rc.7 - 2026-09-04
 
 - Add a loopback-only local settings UI for separate Writer and background-organizer model providers.

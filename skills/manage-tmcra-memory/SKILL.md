@@ -50,8 +50,8 @@ Automatic recall and capture are handled by lifecycle hooks. Use this skill for 
 
 - Call `tmcra_open_local_model_settings` when the user asks to configure the local Writer or background-organizer model provider.
 - The tool opens a temporary loopback page and returns no API Key or setup-session token. Never ask the user to paste a provider key into chat.
-- A successful connection test verifies the configured `/models` endpoint. It does not prove that production memory jobs have moved to local execution.
-- The current release stores and validates local provider settings. Do not claim that ingest or consolidation consumes them until the client task protocol and executor are connected.
+- A successful connection test verifies the configured `/models` endpoint. A completed provider-task receipt proves that a production memory job used the local executor.
+- While the MCP process is running, ingest routes configured Writer work to the local executor and `tmcra_consolidate` routes an explicit background-organizer job. Provider credentials and raw response envelopes remain in the local user process.
 
 ## User controls
 

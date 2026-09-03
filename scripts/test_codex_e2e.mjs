@@ -57,6 +57,9 @@ if (mode === "mock" || mode === "all") {
   const providerSetup = await run(join(pluginRoot, "tests", "provider_setup_contract.mjs"), {
     timeoutMs: 60_000,
   });
+  const providerExecutor = await run(join(pluginRoot, "tests", "provider_executor_contract.mjs"), {
+    timeoutMs: 60_000,
+  });
   const coreMock = await run(join(pluginRoot, "tests", "codex_e2e_mock.mjs"), {
     timeoutMs: 90_000,
   });
@@ -66,7 +69,13 @@ if (mode === "mock" || mode === "all") {
   const claudeCode = await run(join(pluginRoot, "tests", "claude_code_contract.mjs"), {
     timeoutMs: 90_000,
   });
-  output.mock = { ...coreMock, providerSetup, deviceAuthorization, claudeCode };
+  output.mock = {
+    ...coreMock,
+    providerSetup,
+    providerExecutor,
+    deviceAuthorization,
+    claudeCode,
+  };
 }
 
 if (mode === "real" || mode === "all") {

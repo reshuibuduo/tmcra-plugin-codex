@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  consolidate,
   getJob,
   getSession,
   getScopeRecovery,
@@ -28,6 +29,7 @@ import {
   readProviderConfig,
 } from "./provider_config.mjs";
 import { startProviderSetupServer } from "./provider_setup.mjs";
+import { runProviderExecutor } from "./provider_executor.mjs";
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INTEGRATION_LABEL = clientPlatform() === "claude-code" ? "Claude Code" : "Codex";
@@ -180,6 +182,26 @@ const TOOLS = [
           default: "auto",
         },
         idempotency_key: { type: "string", minLength: 1, maxLength: 200 },
+      },
+    },
+  },
+  {
+    name: "tmcra_consolidate",
+    description:
+      "Start one background memory-organization job. Uses the locally configured organizer model when available and returns an asynchronous job ID.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        memory_layer: {
+          type: "string",
+          enum: ["global", "project", "custom"],
+          default: "project",
+        },
+        scope: { type: "string", minLength: 1, maxLength: 200 },
+        project_path: { type: "string" },
+        project_id: { type: "string", minLength: 1, maxLength: 200 },
+        idempotency_key: { type: "string", minLength: 8, maxLength: 200 },
       },
     },
   },
@@ -689,6 +711,23 @@ async function toolIngest(args) {
   };
 }
 
+async function toolConsolidate(args) {
+  const config = await loadConfig();
+  const scopes = await scopesFor(args, config);
+  const layer = args.memory_layer || "project";
+  const scope = customScope(args, layer, scopes);
+  const value = await consolidate({
+    config,
+    scope,
+    idempotencyKey: args.idempotency_key,
+  });
+  return {
+    job_id: publicText(value?.job_id || value?.id, 200),
+    status: publicText(value?.status, 80) || "queued",
+    memory_layer: layer,
+  };
+}
+
 async function lifecycleStatus() {
   const logPath = join(pluginDataDir(), "logs", "events.jsonl");
   if (!existsSync(logPath)) {
@@ -878,6 +917,7 @@ async function callTool(name, args) {
   if (name === "tmcra_recall") return toolRecall(args);
   if (name === "tmcra_last_recall") return toolLastRecall(args);
   if (name === "tmcra_ingest") return toolIngest(args);
+  if (name === "tmcra_consolidate") return toolConsolidate(args);
   if (name === "tmcra_get_job") {
     return publicJob(await getJob(requireString(args.job_id, "job_id")));
   }
@@ -989,7 +1029,13 @@ async function handle(message) {
 }
 
 let buffer = "";
+const providerExecutorAbort = new AbortController();
+void runProviderExecutor({ signal: providerExecutorAbort.signal }).catch(() => undefined);
+for (const signalName of ["SIGINT", "SIGTERM"]) {
+  process.once(signalName, () => providerExecutorAbort.abort());
+}
 process.stdin.setEncoding("utf8");
+process.stdin.once("end", () => providerExecutorAbort.abort());
 process.stdin.on("data", (chunk) => {
   buffer += chunk;
   for (;;) {

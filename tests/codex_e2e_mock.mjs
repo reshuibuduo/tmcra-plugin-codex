@@ -745,7 +745,7 @@ try {
       const listed = await client.request("tools/list");
       assert.deepEqual(
         listed.tools.map((tool) => tool.name).sort(),
-        ["tmcra_get_job", "tmcra_ingest", "tmcra_last_recall", "tmcra_open_local_model_settings", "tmcra_recall", "tmcra_status", "tmcra_wait_job"],
+        ["tmcra_consolidate", "tmcra_get_job", "tmcra_ingest", "tmcra_last_recall", "tmcra_open_local_model_settings", "tmcra_recall", "tmcra_status", "tmcra_wait_job"],
       );
       assert.equal(
         listed.tools.find((tool) => tool.name === "tmcra_status")._meta.ui.resourceUri,
