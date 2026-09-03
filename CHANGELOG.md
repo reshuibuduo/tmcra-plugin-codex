@@ -1,8 +1,12 @@
 # Changelog
 
+## 0.3.0-rc.6 - 2026-09-04
+
+- Canonicalize ZIP creator and file-mode metadata so Windows and Linux now produce the same archive and SHA-256 digest.
+
 ## 0.3.0-rc.5 - 2026-09-04
 
-- Normalize every release entry to UTF-8 with LF line endings so Windows and Linux produce the same ZIP and SHA-256 digest.
+- Normalize every release entry to UTF-8 with LF line endings.
 - Remove a race in the Claude Code ingestion contract on slower CI runners.
 - Scope plugin security scanning to shipped code while retaining high-severity enforcement.
 

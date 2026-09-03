@@ -80,6 +80,52 @@ function Write-Utf8NoBom([string]$Path, [string]$Value) {
     [System.IO.File]::WriteAllText($Path, $Value, (New-Object System.Text.UTF8Encoding($false)))
 }
 
+function Normalize-ZipCentralDirectory([string]$Path) {
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $minimumOffset = [Math]::Max(0, $bytes.Length - 65557)
+    $endOffset = -1
+    for ($index = $bytes.Length - 22; $index -ge $minimumOffset; $index--) {
+        if (
+            $bytes[$index] -eq 0x50 -and
+            $bytes[$index + 1] -eq 0x4b -and
+            $bytes[$index + 2] -eq 0x05 -and
+            $bytes[$index + 3] -eq 0x06
+        ) {
+            $endOffset = $index
+            break
+        }
+    }
+    if ($endOffset -lt 0) {
+        throw "ZIP end-of-central-directory record was not found."
+    }
+
+    $entryCount = [System.BitConverter]::ToUInt16($bytes, $endOffset + 10)
+    $centralOffset = [int][System.BitConverter]::ToUInt32($bytes, $endOffset + 16)
+    for ($entryIndex = 0; $entryIndex -lt $entryCount; $entryIndex++) {
+        if (
+            $bytes[$centralOffset] -ne 0x50 -or
+            $bytes[$centralOffset + 1] -ne 0x4b -or
+            $bytes[$centralOffset + 2] -ne 0x01 -or
+            $bytes[$centralOffset + 3] -ne 0x02
+        ) {
+            throw "Invalid ZIP central-directory entry at offset $centralOffset."
+        }
+
+        # Canonical Unix creator metadata and regular-file mode 0644.
+        $bytes[$centralOffset + 5] = 3
+        $bytes[$centralOffset + 38] = 0
+        $bytes[$centralOffset + 39] = 0
+        $bytes[$centralOffset + 40] = 0xa4
+        $bytes[$centralOffset + 41] = 0x81
+
+        $nameLength = [System.BitConverter]::ToUInt16($bytes, $centralOffset + 28)
+        $extraLength = [System.BitConverter]::ToUInt16($bytes, $centralOffset + 30)
+        $commentLength = [System.BitConverter]::ToUInt16($bytes, $centralOffset + 32)
+        $centralOffset += 46 + $nameLength + $extraLength + $commentLength
+    }
+    [System.IO.File]::WriteAllBytes($Path, $bytes)
+}
+
 function Publish-Atomic([string]$Source, [string]$Destination) {
     if (Test-Path -LiteralPath $Destination) {
         $backup = "$Destination.$([guid]::NewGuid().ToString('N')).bak"
@@ -144,6 +190,8 @@ try {
         $createdArchive.Dispose()
         $archiveStream.Dispose()
     }
+
+    Normalize-ZipCentralDirectory $temporaryArchive
 
     $inspectionStream = [System.IO.File]::Open(
         $temporaryArchive,

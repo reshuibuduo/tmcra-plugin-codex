@@ -150,9 +150,9 @@ async function clientVersion() {
     const manifest = JSON.parse(
       await readFile(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"),
     );
-    return String(manifest.version || "0.3.0-rc.5");
+    return String(manifest.version || "0.3.0-rc.6");
   } catch {
-    return "0.3.0-rc.5";
+    return "0.3.0-rc.6";
   }
 }
 
