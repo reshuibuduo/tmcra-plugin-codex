@@ -1,6 +1,6 @@
 {
   "name": "tmcra-memory-codex-plugin",
-  "version": "0.3.0-rc.4",
+  "version": "0.3.0-rc.5",
   "private": true,
   "description": "Automatic TMCRA long-term memory for Codex and Claude Code",
   "type": "module",

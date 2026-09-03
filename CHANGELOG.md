@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0-rc.5 - 2026-09-04
+
+- Normalize every release entry to UTF-8 with LF line endings so Windows and Linux produce the same ZIP and SHA-256 digest.
+- Remove a race in the Claude Code ingestion contract on slower CI runners.
+- Scope plugin security scanning to shipped code while retaining high-severity enforcement.
+
 ## 0.3.0-rc.4 - 2026-09-04
 
 - Replace the obsolete owner-local four-Hook bridge with the current nine-Hook TMCRA lifecycle implementation.

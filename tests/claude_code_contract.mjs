@@ -215,12 +215,13 @@ try {
   assert.equal(server.records.filter((record) => record.messages.some((message) => message.content === "MUST_NOT_BE_PAIRED")).length, 0);
 
   const claudeConfig = JSON.parse(await readFile(join(pluginRoot, ".claude-plugin", "plugin.json"), "utf8"));
+  const codexConfig = JSON.parse(await readFile(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
   const claudeHooks = JSON.parse(await readFile(join(hooksDir, "claude-hooks.json"), "utf8"));
   assert.equal(claudeConfig.hooks, "./hooks/claude-hooks.json");
   assert.equal(claudeConfig.mcpServers, "./claude-mcp.json");
   assert.equal(claudeConfig.userConfig.api_token.sensitive, true);
   assert.equal(claudeConfig.license, "Apache-2.0");
-  assert.match(claudeConfig.version, /^0\.3\.0-rc\.4\+claude\./u);
+  assert.equal(claudeConfig.version.startsWith(`${codexConfig.version}+claude.`), true);
   assert.match(claudeHooks.hooks.UserPromptSubmit[0].hooks[0].args[0], /CLAUDE_PLUGIN_ROOT/u);
   assert.match(claudeHooks.hooks.UserPromptSubmit[0].hooks[0].args[0], /claude_run_hook\.mjs/u);
 

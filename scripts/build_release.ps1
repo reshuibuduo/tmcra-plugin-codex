@@ -109,6 +109,7 @@ try {
         [System.IO.Compression.ZipArchiveMode]::Create,
         $false
     )
+    $releaseUtf8 = New-Object System.Text.UTF8Encoding($false)
     try {
         foreach ($entry in $releaseFiles) {
             $sourcePath = Join-Path $pluginRoot ($entry.Source.Replace("/", [System.IO.Path]::DirectorySeparatorChar))
@@ -125,14 +126,17 @@ try {
                 0,
                 [System.TimeSpan]::Zero
             )
-            $sourceStream = [System.IO.File]::OpenRead($sourcePath)
             $entryStream = $zipEntry.Open()
             try {
-                $sourceStream.CopyTo($entryStream)
+                # Every release entry is text. Canonical UTF-8/LF bytes make
+                # archives reproducible across Windows and Unix checkouts.
+                $content = [System.IO.File]::ReadAllText($sourcePath)
+                $content = $content.Replace("`r`n", "`n").Replace("`r", "`n")
+                $contentBytes = $releaseUtf8.GetBytes($content)
+                $entryStream.Write($contentBytes, 0, $contentBytes.Length)
             }
             finally {
                 $entryStream.Dispose()
-                $sourceStream.Dispose()
             }
         }
     }
