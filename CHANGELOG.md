@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0-rc.9 - 2026-09-04
+
+- Add complete Codex marketplace presentation metadata so the current plugin bundle can be mirrored and refreshed by community marketplaces.
+
 ## 0.3.0-rc.8 - 2026-09-04
 
 - Execute configured Writer and background-organizer calls from the authenticated local Codex process.

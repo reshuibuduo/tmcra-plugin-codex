@@ -1,6 +1,6 @@
 {
   "name": "tmcra-memory",
-  "version": "0.3.0-rc.8",
+  "version": "0.3.0-rc.9",
   "description": "Automatic long-term memory recall and capture for Codex.",
   "author": {
     "name": "TMCRA",
@@ -35,7 +35,15 @@
       "Show TMCRA installation and lifecycle status.",
       "Open TMCRA local Writer and background-organizer settings."
     ],
-    "brandColor": "#49E5C2"
+    "brandColor": "#49E5C2",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png",
+    "screenshots": [
+      "./assets/overview.png"
+    ],
+    "websiteURL": "https://tmcra.com",
+    "privacyPolicyURL": "https://tmcra.com/privacy",
+    "termsOfServiceURL": "https://tmcra.com/terms"
   },
   "mcpServers": "./.mcp.json"
 }
