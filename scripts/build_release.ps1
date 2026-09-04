@@ -33,6 +33,8 @@ $releaseFiles = @(
     [ordered]@{ Source = ".codex-plugin/plugin.json"; Archive = "plugins/tmcra-memory/.codex-plugin/plugin.json" },
     [ordered]@{ Source = ".mcp.json"; Archive = "plugins/tmcra-memory/.mcp.json" },
     [ordered]@{ Source = "README.md"; Archive = "plugins/tmcra-memory/README.md" },
+    [ordered]@{ Source = "assets/icon.png"; Archive = "plugins/tmcra-memory/assets/icon.png" },
+    [ordered]@{ Source = "assets/overview.png"; Archive = "plugins/tmcra-memory/assets/overview.png" },
     [ordered]@{ Source = "hooks/hook_common.mjs"; Archive = "plugins/tmcra-memory/hooks/hook_common.mjs" },
     [ordered]@{ Source = "hooks/hooks.json"; Archive = "plugins/tmcra-memory/hooks/hooks.json" },
     [ordered]@{ Source = "hooks/post_compact.mjs"; Archive = "plugins/tmcra-memory/hooks/post_compact.mjs" },

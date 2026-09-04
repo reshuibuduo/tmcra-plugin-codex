@@ -44,7 +44,7 @@ const started = Date.now();
 const initialized = await request("initialize", {
   protocolVersion: "2025-03-26",
   capabilities: {},
-  clientInfo: { name: "tmcra-plugin-smoke", version: "0.3.0-rc.9" },
+  clientInfo: { name: "tmcra-plugin-smoke", version: "0.3.0-rc.10" },
 });
 child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
 const listed = await request("tools/list", {});

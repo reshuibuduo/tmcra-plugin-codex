@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0-rc.10 - 2026-09-04
+
+- Include the icon and overview image referenced by the Codex marketplace manifest in every release archive.
+
 ## 0.3.0-rc.9 - 2026-09-04
 
 - Add complete Codex marketplace presentation metadata so the current plugin bundle can be mirrored and refreshed by community marketplaces.
