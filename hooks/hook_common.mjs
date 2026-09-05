@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, open, readFile, rename, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { controlKey, memoryPolicy, mayWrite, beginMemoryTurn, taskContext, budgetEvidence, memoryDashboard,
@@ -1035,18 +1035,17 @@ export async function startOutboxDrain() {
   };
   const signalExistingDrain = async () => {
     await mkdir(outboxDirectory, { recursive: true });
-    try {
-      await utimes(drainRequestPath, new Date(), new Date());
-    } catch (error) {
-      if (error?.code !== "ENOENT") throw error;
-      const handle = await open(drainRequestPath, "wx", 0o600);
-      await handle.close();
-    }
+    // Create-or-open is idempotent across concurrent producers. No truncation,
+    // and no ENOENT -> exclusive-create race can delete another producer's signal.
+    const handle = await open(drainRequestPath, "a", 0o600);
+    await handle.close();
   };
   try {
     if (await fresh(drainLockPath, DRAIN_LOCK_STALE_MS)) {
       await signalExistingDrain();
-      return null;
+      // The worker may have finished after our first observation. Its final
+      // request check and this second lock check form the wakeup handoff.
+      if (await fresh(drainLockPath, DRAIN_LOCK_STALE_MS)) return null;
     }
     if (!(await claimMarker(drainLaunchPath, DRAIN_LAUNCH_STALE_MS))) return null;
     await signalExistingDrain();

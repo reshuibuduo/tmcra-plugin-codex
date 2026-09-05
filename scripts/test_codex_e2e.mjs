@@ -57,6 +57,7 @@ if (mode === "mock" || mode === "all") {
   const memoryControls = await run(join(pluginRoot, "tests", "memory_controls_contract.mjs"));
   const chatConfirmation = await run(join(pluginRoot, "tests", "chat_confirmation_contract.mjs"));
   const fullLocal = await run(join(pluginRoot, "tests", "full_local_contract.mjs"));
+  const outboxWakeup = await run(join(pluginRoot, "tests", "outbox_wakeup_mock.mjs"));
   const localSetup = await run(join(pluginRoot, "tests", "local_setup_contract.mjs"));
   const providerSetup = await run(join(pluginRoot, "tests", "provider_setup_contract.mjs"), {
     timeoutMs: 60_000,
@@ -77,6 +78,7 @@ if (mode === "mock" || mode === "all") {
     memoryControls,
     chatConfirmation,
     fullLocal,
+    outboxWakeup,
     localSetup,
     ...coreMock,
     providerSetup,
