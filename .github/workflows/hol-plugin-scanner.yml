@@ -28,7 +28,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: HOL Plugin Scanner
-        uses: hashgraph-online/ai-plugin-scanner-action@7e420247177d5beebbd3747ed16e4b29a1e41f57 # v1
+        uses: hashgraph-online/ai-plugin-scanner-action@d93c35b235ae854bcb181f2472f6d019619e8048 # v1; plugin-scanner 3.0.94
         with:
           plugin_dir: "."
           mode: scan
@@ -36,6 +36,7 @@ jobs:
           fail_on_severity: high
           format: sarif
           upload_sarif: true
+          install_cisco: true
       - name: Show scanner findings even when the gate fails
         if: always()
         run: |

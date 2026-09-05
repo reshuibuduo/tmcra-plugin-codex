@@ -14,6 +14,18 @@ function openBrowser(url) {
   child.on("error", () => {}); child.unref();
 }
 
+// Setup has no authenticated memory scope. Provider/install actions are handled
+// by the loopback server; this handler exposes only an empty, read-only shell.
+export async function localSetupAction(action) {
+  if (action === "dashboard") return {
+    localSetup: true, accountRequired: false, scope: "本地安装", sessionId: "local-installation",
+    policy: { mode: "off", read: false, write: false, generation: 0 },
+    currentTaskId: null, tasks: [], recent: [], budgetChars: 12000,
+    availableScopes: [], delivery: { configured: false, installationRequired: true },
+  };
+  throw new Error("请先在模型配置页面完成本地安装，再重新从插件打开工作台。此安装入口不会访问记忆数据。");
+}
+
 export function createMemoryActions({ config, scope, sessionId, globalScope, request, status = async () => ({}), confirmFeedback }) {
   if (!sessionId?.trim()) throw new Error("An exact session_id is required");
   const key = controlKey(config, scope);

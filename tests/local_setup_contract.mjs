@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -34,7 +34,14 @@ try {
   assert.equal(state.result.missing, null);
   assert.equal(state.result.profiles.length, 3);
   assert.equal(state.result.available, process.platform === "win32" && process.arch === "x64");
-  assert.equal((await action("knowledge")).status, 400);
+  const dashboard = await (await action("dashboard")).json();
+  assert.equal(dashboard.result.localSetup, true);
+  assert.equal(dashboard.result.policy.read, false);
+  assert.equal(dashboard.result.policy.write, false);
+  assert.deepEqual(dashboard.result.tasks, []);
+  for (const operation of ["knowledge", "graph", "evidence", "mode", "budget", "task", "feedback", "correction_start"])
+    assert.equal((await action(operation)).status, 400, `${operation} must require an authenticated workspace`);
+  await assert.rejects(() => access(env.TMCRA_MEMORY_STATE_DIR), { code: "ENOENT" });
   assert.match(await (await fetch(url.origin)).text(), /记忆工作台/u);
   await action("close");
   assert.equal(await exit, 0);

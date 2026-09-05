@@ -31,7 +31,7 @@ import {
 } from "./provider_config.mjs";
 import { startProviderSetupServer } from "./provider_setup.mjs";
 import { runProviderExecutor } from "./provider_executor.mjs";
-import { createMemoryActions, startMemoryCenter } from "./memory_center.mjs";
+import { createMemoryActions, localSetupAction, startMemoryCenter } from "./memory_center.mjs";
 import { controlKey, memoryPolicy, mayWrite } from "./memory_controls.mjs";
 import { localProviderExecutionHeaders } from "./tmcra_client.mjs";
 
@@ -960,10 +960,7 @@ async function memoryActions(args, confirmFeedback) {
 
 async function callTool(name, args, requestId) {
   if (name === "tmcra_open_local_install") {
-    const invoke = createMemoryActions({ config: { baseUrl: "http://127.0.0.1:2009", apiKey: "local-setup-placeholder" },
-      scope: "local-installation", sessionId: "local-installation",
-      request: async () => { throw Error("Complete local installation on the model page first; this setup entry never contacts TMCRA servers."); } });
-    const center = await startMemoryCenter({ invoke });
+    const center = await startMemoryCenter({ invoke: localSetupAction });
     return { url: center.url, account_required: false, installation_started: false, expires_after_idle_minutes: 10 };
   }
   if (name === "tmcra_memory_control") return (await memoryActions(args, (message) => askFeedbackConfirmation(message, requestId)))(args.operation, args);
