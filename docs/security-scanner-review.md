@@ -34,3 +34,11 @@ verify that it creates no memory-control state.
 The remaining scanner finding needs an upstream language-aware detector fix or
 explicit marketplace maintainer adjudication. A passing functional test suite
 must not be described as a passing marketplace security scan.
+
+The current GitHub Action also ignores repository-owned scanner policy by default.
+Consequently its raw CI report includes `HARDCODED_SECRET` findings for synthetic
+mock credentials in `tests/`, while the local CLI respects the pre-existing
+test-fixture exclusion in `.plugin-scanner.toml`. Those reports are different and
+neither is a passing severity gate. The tests use mock/synthetic sentinel values;
+they are excluded from the install ZIP by its explicit release-file inventory.
+No new exclusions or policy-trust overrides were introduced in the Action.
