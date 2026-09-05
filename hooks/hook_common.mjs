@@ -3,6 +3,8 @@ import { spawn } from "node:child_process";
 import { mkdir, open, readFile, rename, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { controlKey, memoryPolicy, mayWrite, beginMemoryTurn, taskContext, budgetEvidence, memoryDashboard,
+  recordMemoryActivity, finishObservedTurn } from "../scripts/memory_controls.mjs";
 import {
   appendTaskEvent,
   appendLog,
@@ -382,6 +384,7 @@ async function recallLayer(scope, query, config) {
       queryId: response?.query_id || null,
       requestId: response?.request_id || response?.requestId || null,
       content,
+      sources: response?.prompt_evidence?.sources || [],
       windowCount: Number.isInteger(promptEvidence?.window_count)
         ? promptEvidence.window_count
         : evidenceWindows.length || (content ? 1 : 0),
@@ -406,21 +409,28 @@ async function recallLayer(scope, query, config) {
 }
 
 export async function recallForContext(input, query) {
-  const safeQuery = bounded(query, 20_000);
   const { config, scopes, host } = await resolveHookContext(input);
+  const sessionId = await resolveLifecycleSessionId(input);
+  const policy = await memoryPolicy(controlKey(config, scopes.projectScope), sessionId);
+  if (!policy.read) return { context: "", status: "disabled", scopes, host, layers: {} };
+  const continuation = await taskContext(policy.key, sessionId, query, { capture: policy });
+  const safeQuery = bounded(continuation.query, 20_000);
   const [globalMemory, projectMemory] = await Promise.all([
     recallLayer(scopes.globalScope, safeQuery, config),
     recallLayer(scopes.projectScope, safeQuery, config),
   ]);
-  const blocks = [];
-  if (globalMemory.content) {
-    blocks.push(`Memory layer: user-global\n${globalMemory.content}`);
-  }
-  if (projectMemory.content) {
-    blocks.push(
-      `Memory layer: project (${scopes.projectName}; ${scopes.projectId})\n${projectMemory.content}`,
-    );
-  }
+  const dashboard = await memoryDashboard(policy.key, sessionId);
+  const selection = budgetEvidence([
+    { ...globalMemory, label: "Memory layer: user-global" },
+    { ...projectMemory, label: `Memory layer: project (${scopes.projectName}; ${scopes.projectId})` },
+  ], {
+    budgetChars: dashboard.budgetChars,
+    // A persisted receipt alone does not prove evidence survived compaction.
+    visibleText: visibleMemoryContext(input.messages),
+  });
+  const blocks = selection.content ? [selection.content] : [];
+  if (continuation.task) blocks.unshift(`Task handoff (historical work, verify before acting):\n${safeQuery}`);
+  if (continuation.candidates.length > 1) blocks.unshift(`Multiple active tasks; ask which task to continue:\n${JSON.stringify(continuation.candidates)}`);
   const successfulLayers = [globalMemory, projectMemory]
     .filter((layer) => layer.status === "success");
   const failedLayers = [globalMemory, projectMemory]
@@ -430,8 +440,7 @@ export async function recallForContext(input, query) {
     : failedLayers.length === 0
       ? "completed"
       : "degraded";
-  const sessionId = await resolveLifecycleSessionId(input);
-  await saveRecallReceipt({
+  if (await mayWrite(policy)) await saveRecallReceipt({
     projectId: scopes.projectId,
     sessionId,
     turnId: pairingTurnId(input),
@@ -443,6 +452,7 @@ export async function recallForContext(input, query) {
       requestId: globalMemory.requestId,
       count: globalMemory.windowCount,
       content: globalMemory.content,
+      sources: globalMemory.sources,
     },
     project: {
       status: projectMemory.status,
@@ -450,8 +460,11 @@ export async function recallForContext(input, query) {
       requestId: projectMemory.requestId,
       count: projectMemory.windowCount,
       content: projectMemory.content,
+      sources: projectMemory.sources,
     },
   });
+  await recordMemoryActivity(policy, { kind: "recall", query: safeQuery, selection,
+    layers: [globalMemory, projectMemory] });
   await appendLog(`recall_${status}`, {
     host,
     lifecycleContractVersion: LIFECYCLE_CONTRACT_VERSION,
@@ -479,14 +492,26 @@ export async function recallForContext(input, query) {
   };
 }
 
+function visibleMemoryContext(messages) {
+  if (!Array.isArray(messages)) return "";
+  return messages.filter((row) => ["user", "assistant", "system"].includes(row.role))
+    .map((row) => typeof row.content === "string" ? row.content
+      : Array.isArray(row.content) ? row.content.map((part) => part.text || "").join("\n") : "")
+    .join("\n");
+}
+
 export async function rememberPrompt(input) {
   const prompt = bounded(input.prompt);
   if (!prompt) return null;
-  const { scopes, host } = await resolveHookContext(input);
+  const { config, scopes, host } = await resolveHookContext(input);
   const sessionId = await resolveLifecycleSessionId(input);
+  let capture = await memoryPolicy(controlKey(config, scopes.projectScope), sessionId);
+  if (!capture.write) return null;
+  const continuation = await taskContext(capture.key, sessionId, prompt, { capture });
   let value;
   await withTaskStateLock(sessionId, async () => {
     const turnId = await allocatePendingTurnId(sessionId, pairingTurnId(input), input);
+    capture = await beginMemoryTurn(capture.key, sessionId, turnId);
     value = {
       host,
       sessionId,
@@ -497,6 +522,7 @@ export async function rememberPrompt(input) {
       promptAt: new Date().toISOString(),
       cwd: String(input.cwd || ""),
       scopes,
+      capture,
     };
     await savePendingTurn(value);
     await registerPendingTurn(value);
@@ -518,7 +544,8 @@ export async function rememberPrompt(input) {
     } : {
       host,
       activeTurnId: value.turnId,
-      objective: prompt,
+      objective: continuation.task?.objective || prompt,
+      capture,
       objectiveAt: value.promptAt,
       cwd: value.cwd,
       scopes,
@@ -591,6 +618,7 @@ function taskHandoff(objective, progress, checkpoint) {
 }
 
 async function queueTaskCheckpoint(sessionId, state, checkpoint) {
+  if (state.capture && !await mayWrite(state.capture)) return null;
   const host = state.host || "codex";
   const normalizedSessionId = stableSessionId(host, sessionId);
   const isFinalCheckpoint = checkpoint.reason.startsWith("pre_compact_") ||
@@ -640,6 +668,7 @@ async function queueTaskCheckpoint(sessionId, state, checkpoint) {
     pluginVersion: PLUGIN_VERSION,
     lifecycleContractVersion: LIFECYCLE_CONTRACT_VERSION,
     projectId: state.scopes.projectId,
+    capture: state.capture,
     scope,
     sessionId: normalizedSessionId,
     messages,
@@ -663,6 +692,7 @@ export async function checkpointTaskContinuity(
   return withTaskStateLock(sessionId, async () => {
     const state = await loadTaskState(sessionId);
     if (!state) return null;
+    if (state.capture && !await mayWrite(state.capture)) return null;
     const events = await listTaskEvents(sessionId);
     const previous = await loadTaskCheckpoint(sessionId);
     if (!force && !shouldCheckpointTask(state, events)) return null;
@@ -713,6 +743,7 @@ export async function recordToolUse(input) {
   const sessionId = await resolveLifecycleSessionId(input);
   const state = await loadTaskState(sessionId);
   if (!state) return null;
+  if (state.capture && !await mayWrite(state.capture)) return null;
   const toolName = bounded(input.tool_name || input.tool || "tool", 200);
   if (/tmcra(?:-|_)?memory|^tmcra_/iu.test(toolName)) return null;
   const event = await appendTaskEvent(sessionId, {
@@ -750,6 +781,8 @@ export async function resumeTaskContinuity(input) {
   const sessionId = await resolveLifecycleSessionId(input);
   let state = await loadTaskState(sessionId);
   if (!state) return "";
+  const { config, scopes } = await resolveHookContext(input);
+  if (!(await memoryPolicy(controlKey(config, scopes.projectScope), sessionId)).read) return "";
   let checkpoint = await loadTaskCheckpoint(sessionId);
   const pendingEvents = await listTaskEvents(sessionId);
   if (pendingEvents.length || !checkpoint) {
@@ -826,6 +859,11 @@ export async function ingestCompletedTurn(input) {
     return null;
   }
   const pending = await loadPendingTurn(sessionId, turnId);
+  if (pending?.capture && !await mayWrite(pending.capture)) {
+    await removePendingTurn(sessionId, turnId);
+    await removePendingIndexEntry(sessionId, turnId);
+    return { skipped: true, reason: "memory_mode_changed" };
+  }
   const assistant = bounded(input.last_assistant_message);
   if (!pending || !assistant) {
     await appendLog("ingest_skipped", {
@@ -889,6 +927,7 @@ export async function ingestCompletedTurn(input) {
     pluginVersion: PLUGIN_VERSION,
     projectId: pending.scopes.projectId,
     scope,
+    capture: pending.capture,
     sessionId: normalizedSessionId,
     messages,
     metadata,
@@ -916,6 +955,10 @@ export async function ingestCompletedTurn(input) {
   }
   await removePendingTurn(sessionId, turnId);
   await removePendingIndexEntry(sessionId, turnId);
+  if (pending.capture) {
+    await finishObservedTurn(pending.capture, pending.prompt, assistant);
+    await recordMemoryActivity(pending.capture, { kind: "write", state: "queued", outboxId: queued.outboxId });
+  }
   await appendLog("ingest_queued", {
     host,
     pluginVersion: PLUGIN_VERSION,

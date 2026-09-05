@@ -1,5 +1,13 @@
 # TMCRA Memory for Codex
 
+## 独立本地安装 / Server-independent installation
+
+Windows x64：解压后双击 `Install-Local.cmd`。自动安装 Python、依赖、校验后的模型和本机 Memory API，自动生成私有本地身份。无需 TMCRA 账号、服务器或预装 Python；首次下载需联网。完成后重启 Codex，并由用户审核九项 Hook。轻量档建议 16GB 内存且启动时约 6.3GiB 空闲。完整模型验收仍有限制，详见插件 README 的本地部署章节。
+
+On Windows x64, double-click `Install-Local.cmd` after extracting the entire archive. Setup automatically prepares private Python, verified models and the Memory API, with local identity discovery. No TMCRA server, account or preinstalled Python is required. Internet is needed for first-time downloads. Restart Codex and personally review all nine Hooks. See the bundled README for resource requirements and partial model acceptance results.
+
+## 托管服务 / Hosted service
+
 保留解压后的 `.agents`、`plugins` 和根目录安装脚本，然后在解压目录中运行：
 
 ```powershell

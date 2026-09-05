@@ -250,6 +250,10 @@ async function drain() {
         }
         try {
           const result = await submitOutboxTurn(entry, config);
+          if (result.skipped) {
+            await appendLog("ingest_discarded", { outboxId: entry.outboxId, reason: result.reason });
+            continue;
+          }
           const submitted = await markOutboxSubmitted(entry, result);
           await clearOutboxCircuit(entry);
           inFlightJobs += 1;

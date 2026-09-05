@@ -1,0 +1,9 @@
+fastapi>=0.115,<1
+pydantic>=2.8,<3
+uvicorn[standard]>=0.30,<1
+networkx>=3.2,<4
+numpy>=1.26,<3
+openai>=1.0,<3
+psutil>=5.9,<8
+torch>=2.4,<3
+transformers>=4.45,<5
