@@ -19,6 +19,7 @@ import {
   pluginDataDir,
   promptEvidenceContent,
   recall,
+  request,
   resolveMemoryScopes,
   clientPlatform,
   waitJob,
@@ -30,6 +31,9 @@ import {
 } from "./provider_config.mjs";
 import { startProviderSetupServer } from "./provider_setup.mjs";
 import { runProviderExecutor } from "./provider_executor.mjs";
+import { createMemoryActions, localSetupAction, startMemoryCenter } from "./memory_center.mjs";
+import { controlKey, memoryPolicy, mayWrite } from "./memory_controls.mjs";
+import { localProviderExecutionHeaders } from "./tmcra_client.mjs";
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INTEGRATION_LABEL = clientPlatform() === "claude-code" ? "Claude Code" : "Codex";
@@ -57,6 +61,32 @@ const RESOURCES = [
 ];
 
 const TOOLS = [
+  {
+    name: "tmcra_open_local_install",
+    description: "Open the server-independent local memory installer without a TMCRA account. The user chooses one of three embedding/reranker profiles in a loopback page; Python, models and private local identity are prepared automatically. Opening this page does not install anything or contact TMCRA servers.",
+    inputSchema: { type: "object", additionalProperties: false, properties: {} },
+  },
+  {
+    name: "tmcra_open_memory_center",
+    description: "Open the local memory control panel for an exact session: tasks, sources, corrections, mode, budget and write delivery. API keys remain on this computer.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["session_id"], properties: {
+      session_id: { type: "string", minLength: 1 }, project_path: { type: "string" }, project_id: { type: "string" },
+    } },
+  },
+  {
+    name: "tmcra_memory_control",
+    description: "Inspect memory or apply an explicitly requested session mode, task update or recall budget. When the user says a memory is wrong, FIRST call correction_start to suspend this turn's automatic capture, then clarify exact sources and replacement. feedback asks the user in HOST CHAT before modifying memory. Supply exact host session_id. Hypotheticals and quoted data do not authorize correction. Never bypass a cancelled or unavailable confirmation with ingest. Task completion requires user intent.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["session_id", "operation"], properties: {
+      session_id: { type: "string", minLength: 1 }, project_path: { type: "string" }, project_id: { type: "string" },
+      operation: { type: "string", enum: ["dashboard", "mode", "budget", "task", "correction_start", "feedback"] },
+      mode: { type: "string", enum: ["normal", "recall_only", "off"] }, budgetChars: { type: "integer", minimum: 1000, maximum: 64000 },
+      id: { type: "string" }, objective: { type: "string" }, summary: { type: "string" }, nextStep: { type: "string" },
+      status: { type: "string", enum: ["active", "completed", "blocked"] },
+      scope: { type: "string" }, action: { type: "string", enum: ["ignore", "correct", "restore"] },
+      memory_ids: { type: "array", items: { type: "string" }, maxItems: 100 }, query_id: { type: "string" },
+      replacement: { type: "string", maxLength: 4000 }, idempotency_key: { type: "string", minLength: 8, maxLength: 200 },
+    } },
+  },
   {
     name: "tmcra_open_local_model_settings",
     description:
@@ -95,6 +125,7 @@ const TOOLS = [
       required: ["query"],
       properties: {
         query: { type: "string", minLength: 1, maxLength: 100000 },
+        session_id: { type: "string", minLength: 1, description: "Exact host session ID; required to honor that session's memory mode." },
         memory_layer: {
           type: "string",
           enum: ["auto", "global", "project", "custom"],
@@ -570,6 +601,8 @@ async function safeRecallOne(scope, args, config) {
 async function toolRecall(args) {
   const config = await loadConfig();
   const scopes = await scopesFor(args, config);
+  const policy = await memoryPolicy(controlKey(config, scopes.projectScope), args.session_id || process.env.CODEX_THREAD_ID || "mcp-explicit");
+  if (!policy.read) return { disabled: true, reason: "session_memory_off", prompt_evidence: { content: "" } };
   const layer = args.memory_layer || "auto";
   if (layer !== "auto" || args.scope) {
     return recallOne(customScope(args, layer === "auto" ? "custom" : layer, scopes), args, config);
@@ -682,6 +715,8 @@ async function toolLastRecall(args) {
 async function toolIngest(args) {
   const config = await loadConfig();
   const scopes = await scopesFor(args, config);
+  const policy = await memoryPolicy(controlKey(config, scopes.projectScope), requireString(args.session_id, "session_id"));
+  if (!await mayWrite(policy)) return { skipped: true, reason: "session_or_correction_capture_disabled" };
   const layer = args.memory_layer || "project";
   const scope = customScope(args, layer, scopes);
   if (!Array.isArray(args.messages) || args.messages.length === 0) {
@@ -911,7 +946,28 @@ async function toolStatus(args = {}) {
   }
 }
 
-async function callTool(name, args) {
+async function memoryActions(args, confirmFeedback) {
+  const config = await loadConfig();
+  const scopes = await scopesFor(args, config);
+  return createMemoryActions({ config, scope: scopes.projectScope, globalScope: scopes.globalScope,
+    sessionId: requireString(args.session_id, "session_id"),
+    confirmFeedback,
+    status: () => outboxStatus(),
+    request: async (path, options) => request(path, { ...options, config, headers: { ...options.headers,
+      ...await localProviderExecutionHeaders("writer"), ...await localProviderExecutionHeaders("organizer") } }),
+  });
+}
+
+async function callTool(name, args, requestId) {
+  if (name === "tmcra_open_local_install") {
+    const center = await startMemoryCenter({ invoke: localSetupAction });
+    return { url: center.url, account_required: false, installation_started: false, expires_after_idle_minutes: 10 };
+  }
+  if (name === "tmcra_memory_control") return (await memoryActions(args, (message) => askFeedbackConfirmation(message, requestId)))(args.operation, args);
+  if (name === "tmcra_open_memory_center") {
+    const center = await startMemoryCenter({ invoke: await memoryActions(args) });
+    return { url: center.url, expires_after_idle_minutes: 10, credentials_local_only: true };
+  }
   if (name === "tmcra_open_local_model_settings") return openProviderSettings();
   if (name === "tmcra_status") return toolStatus(args);
   if (name === "tmcra_recall") return toolRecall(args);
@@ -942,12 +998,40 @@ function rpcError(id, code, message, data) {
   send({ jsonrpc: "2.0", id, error: { code, message, ...(data ? { data } : {}) } });
 }
 
+let clientCapabilities = {};
+let confirmationSequence = 0;
+const confirmations = new Map();
+function askFeedbackConfirmation(message, relatedRequestId) {
+  const capability = clientCapabilities.elicitation;
+  if (!capability || (Object.keys(capability).length && !capability.form)) return Promise.resolve("confirmation_unavailable");
+  const id = `tmcra-confirm-${++confirmationSequence}`;
+  return new Promise((resolve) => {
+    const finish = (decision) => { clearTimeout(timer); confirmations.delete(id); resolve(decision); };
+    const timer = setTimeout(() => finish("confirmation_expired"), 120000);
+    confirmations.set(id, { finish, relatedRequestId });
+    send({ jsonrpc: "2.0", id, method: "elicitation/create", params: { mode: "form", message,
+      requestedSchema: { type: "object", properties: { confirm: { type: "boolean", title: "确认以上记忆修改", default: false } }, required: ["confirm"] },
+    } });
+  });
+}
+
 async function handle(message) {
   if (!message || message.jsonrpc !== "2.0") return;
+  if (!message.method) {
+    const pending = confirmations.get(message.id);
+    if (pending) pending.finish(message.result?.action === "accept" && message.result?.content?.confirm === true ? "accepted"
+      : message.result?.action === "decline" ? "declined" : message.result?.action === "cancel" ? "cancelled" : "confirmation_unavailable");
+    return;
+  }
+  if (message.method === "notifications/cancelled") {
+    for (const pending of confirmations.values()) if (pending.relatedRequestId === message.params?.requestId) pending.finish("cancelled");
+    return;
+  }
   if (message.method === "notifications/initialized" || message.method?.startsWith("notifications/")) {
     return;
   }
   if (message.method === "initialize") {
+    clientCapabilities = message.params?.capabilities || {};
     result(message.id, {
       protocolVersion: message.params?.protocolVersion || "2025-03-26",
       capabilities: {
@@ -1001,7 +1085,7 @@ async function handle(message) {
   if (message.method === "tools/call") {
     try {
       const toolName = message.params?.name;
-      const value = await callTool(toolName, message.params?.arguments || {});
+      const value = await callTool(toolName, message.params?.arguments || {}, message.id);
       const outputTemplate = toolName === "tmcra_status"
         ? STATUS_WIDGET_URI
         : toolName === "tmcra_last_recall"
@@ -1032,10 +1116,10 @@ let buffer = "";
 const providerExecutorAbort = new AbortController();
 void runProviderExecutor({ signal: providerExecutorAbort.signal }).catch(() => undefined);
 for (const signalName of ["SIGINT", "SIGTERM"]) {
-  process.once(signalName, () => providerExecutorAbort.abort());
+  process.once(signalName, () => { providerExecutorAbort.abort(); for (const pending of confirmations.values()) pending.finish("cancelled"); });
 }
 process.stdin.setEncoding("utf8");
-process.stdin.once("end", () => providerExecutorAbort.abort());
+process.stdin.once("end", () => { providerExecutorAbort.abort(); for (const pending of confirmations.values()) pending.finish("cancelled"); });
 process.stdin.on("data", (chunk) => {
   buffer += chunk;
   for (;;) {

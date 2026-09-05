@@ -10,3 +10,6 @@ Thumbs.db
 .tmcra/
 scanner-report.*
 release/
+test-artifacts/
+__pycache__/
+*.py[cod]

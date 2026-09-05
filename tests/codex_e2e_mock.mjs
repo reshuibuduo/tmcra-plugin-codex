@@ -745,7 +745,7 @@ try {
       const listed = await client.request("tools/list");
       assert.deepEqual(
         listed.tools.map((tool) => tool.name).sort(),
-        ["tmcra_consolidate", "tmcra_get_job", "tmcra_ingest", "tmcra_last_recall", "tmcra_open_local_model_settings", "tmcra_recall", "tmcra_status", "tmcra_wait_job"],
+        ["tmcra_consolidate", "tmcra_get_job", "tmcra_ingest", "tmcra_last_recall", "tmcra_memory_control", "tmcra_open_local_install", "tmcra_open_local_model_settings", "tmcra_open_memory_center", "tmcra_recall", "tmcra_status", "tmcra_wait_job"],
       );
       assert.equal(
         listed.tools.find((tool) => tool.name === "tmcra_status")._meta.ui.resourceUri,
@@ -887,6 +887,32 @@ try {
       1,
       "idempotent MCP ingest stored duplicate data",
     );
+  });
+
+  await test("Session controls reach real hooks and preserve continuation queries", async () => {
+    const client = new McpClient(env, projectA);
+    try {
+      await client.initialize();
+      for (const mode of ["off", "recall_only"]) {
+        const sessionId = `controls-${mode}`;
+        const control = await client.call("tmcra_memory_control", { operation: "mode", mode, session_id: sessionId, project_path: projectA });
+        assert.equal(control.isError, false);
+        const before = server.requests.filter((item) => item.pathname.endsWith("/recall")).length;
+        const input = { session_id: sessionId, turn_id: "private-turn", cwd: projectA, prompt: `DO_NOT_BACKFILL_${mode}` };
+        parseJson(await runNode(join(hooksDir, "user_prompt_submit.mjs"), [], { cwd: projectA, env, input: JSON.stringify(input) }));
+        assert.equal(server.requests.filter((item) => item.pathname.endsWith("/recall")).length - before, mode === "off" ? 0 : 2);
+        await client.call("tmcra_memory_control", { operation: "mode", mode: "normal", session_id: sessionId, project_path: projectA });
+        await runNode(join(hooksDir, "stop.mjs"), [], { cwd: projectA, env, input: JSON.stringify({ ...input, last_assistant_message: "PRIVATE_RESULT_MUST_NOT_BACKFILL" }) });
+      }
+      assert(!JSON.stringify(server.records).includes("DO_NOT_BACKFILL_"));
+      assert(!JSON.stringify(server.records).includes("PRIVATE_RESULT_MUST_NOT_BACKFILL"));
+      await client.call("tmcra_memory_control", { operation: "task", session_id: "controls-continuation", project_path: projectA,
+        objective: "CONTINUITY_TARGET_AUTHENTICATION", nextStep: "VERIFY_TOKEN_EXPIRY" });
+      const continued = parseJson(await runNode(join(hooksDir, "user_prompt_submit.mjs"), [], { cwd: projectA, env,
+        input: JSON.stringify({ session_id: "controls-continuation", turn_id: "continue-one", cwd: projectA, prompt: "继续" }) }));
+      assert.match(continued.hookSpecificOutput.additionalContext, /CONTINUITY_TARGET_AUTHENTICATION/u);
+      assert(server.requests.filter((item) => item.pathname.endsWith("/recall")).slice(-2).every((item) => item.query.includes("VERIFY_TOKEN_EXPIRY")));
+    } finally { await client.close(); }
   });
 
   await test("Codex hooks recall, Stop ingest, sessions, and cross-session memory", async () => {

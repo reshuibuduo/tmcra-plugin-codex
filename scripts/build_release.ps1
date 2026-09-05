@@ -33,7 +33,9 @@ $releaseFiles = @(
     [ordered]@{ Source = ".codex-plugin/plugin.json"; Archive = "plugins/tmcra-memory/.codex-plugin/plugin.json" },
     [ordered]@{ Source = ".mcp.json"; Archive = "plugins/tmcra-memory/.mcp.json" },
     [ordered]@{ Source = "README.md"; Archive = "plugins/tmcra-memory/README.md" },
+    [ordered]@{ Source = "docs/memory-controls.md"; Archive = "plugins/tmcra-memory/docs/memory-controls.md" },
     [ordered]@{ Source = "assets/icon.png"; Archive = "plugins/tmcra-memory/assets/icon.png" },
+    [ordered]@{ Source = "assets/tmcra-logo.png"; Archive = "plugins/tmcra-memory/assets/tmcra-logo.png" },
     [ordered]@{ Source = "assets/overview.png"; Archive = "plugins/tmcra-memory/assets/overview.png" },
     [ordered]@{ Source = "hooks/hook_common.mjs"; Archive = "plugins/tmcra-memory/hooks/hook_common.mjs" },
     [ordered]@{ Source = "hooks/hooks.json"; Archive = "plugins/tmcra-memory/hooks/hooks.json" },
@@ -54,6 +56,17 @@ $releaseFiles = @(
     [ordered]@{ Source = "scripts/install.ps1"; Archive = "plugins/tmcra-memory/scripts/install.ps1" },
     [ordered]@{ Source = "scripts/install.sh"; Archive = "plugins/tmcra-memory/scripts/install.sh" },
     [ordered]@{ Source = "scripts/mcp_server.mjs"; Archive = "plugins/tmcra-memory/scripts/mcp_server.mjs" },
+    [ordered]@{ Source = "scripts/memory_controls.mjs"; Archive = "plugins/tmcra-memory/scripts/memory_controls.mjs" },
+    [ordered]@{ Source = "scripts/memory_center.mjs"; Archive = "plugins/tmcra-memory/scripts/memory_center.mjs" },
+    [ordered]@{ Source = "scripts/local_deployment.mjs"; Archive = "plugins/tmcra-memory/scripts/local_deployment.mjs" },
+    [ordered]@{ Source = "scripts/local_binding.mjs"; Archive = "plugins/tmcra-memory/scripts/local_binding.mjs" },
+    [ordered]@{ Source = "scripts/local_setup.mjs"; Archive = "plugins/tmcra-memory/scripts/local_setup.mjs" },
+    [ordered]@{ Source = "resources/local-model-profiles.json"; Archive = "plugins/tmcra-memory/resources/local-model-profiles.json" },
+    [ordered]@{ Source = "resources/memory-center.html"; Archive = "plugins/tmcra-memory/resources/memory-center.html" },
+    [ordered]@{ Source = "resources/workspace-panels.js"; Archive = "plugins/tmcra-memory/resources/workspace-panels.js" },
+    [ordered]@{ Source = "resources/workspace-panels.css"; Archive = "plugins/tmcra-memory/resources/workspace-panels.css" },
+    [ordered]@{ Source = "resources/memory-status.html"; Archive = "plugins/tmcra-memory/resources/memory-status.html" },
+    [ordered]@{ Source = "resources/recall-inspector.html"; Archive = "plugins/tmcra-memory/resources/recall-inspector.html" },
     [ordered]@{ Source = "scripts/project_bootstrap.mjs"; Archive = "plugins/tmcra-memory/scripts/project_bootstrap.mjs" },
     [ordered]@{ Source = "scripts/project_init.mjs"; Archive = "plugins/tmcra-memory/scripts/project_init.mjs" },
     [ordered]@{ Source = "scripts/provider_config.mjs"; Archive = "plugins/tmcra-memory/scripts/provider_config.mjs" },
@@ -65,8 +78,21 @@ $releaseFiles = @(
     [ordered]@{ Source = "skills/manage-tmcra-memory/SKILL.md"; Archive = "plugins/tmcra-memory/skills/manage-tmcra-memory/SKILL.md" },
     [ordered]@{ Source = "packaging/INSTALL-TMCRA-CODEX.md"; Archive = "INSTALL-TMCRA-CODEX.md" },
     [ordered]@{ Source = "packaging/Install-TMCRA.ps1"; Archive = "Install-TMCRA.ps1" },
+    [ordered]@{ Source = "packaging/Install-Local.cmd"; Archive = "Install-Local.cmd" },
     [ordered]@{ Source = "packaging/install.sh"; Archive = "install.sh" }
 )
+
+$runtimeInventoryPath = Join-Path $pluginRoot 'runtime/memory-api/runtime-files.json'
+$runtimeInventory = Get-Content -Raw -LiteralPath $runtimeInventoryPath | ConvertFrom-Json
+foreach ($entry in $runtimeInventory.PSObject.Properties) {
+    $runtimeFile = Join-Path $pluginRoot "runtime/memory-api/$($entry.Name)"
+    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeFile).Hash.ToLowerInvariant() -ne $entry.Value) {
+        throw "Bundled local runtime integrity mismatch: $($entry.Name)"
+    }
+    $releaseFiles += [ordered]@{Source="runtime/memory-api/$($entry.Name)";Archive="plugins/tmcra-memory/runtime/memory-api/$($entry.Name)"}
+}
+$releaseFiles += [ordered]@{Source='runtime/memory-api/runtime-files.json';Archive='plugins/tmcra-memory/runtime/memory-api/runtime-files.json'}
+$releaseFiles += [ordered]@{Source='runtime/LICENSE';Archive='plugins/tmcra-memory/runtime/LICENSE'}
 
 foreach ($entry in $releaseFiles) {
     $sourcePath = Join-Path $pluginRoot ($entry.Source.Replace("/", [System.IO.Path]::DirectorySeparatorChar))
@@ -180,11 +206,15 @@ try {
             )
             $entryStream = $zipEntry.Open()
             try {
-                # Every release entry is text. Canonical UTF-8/LF bytes make
-                # archives reproducible across Windows and Unix checkouts.
-                $content = [System.IO.File]::ReadAllText($sourcePath)
-                $content = $content.Replace("`r`n", "`n").Replace("`r", "`n")
-                $contentBytes = $releaseUtf8.GetBytes($content)
+                if ([System.IO.Path]::GetExtension($sourcePath) -in @('.png', '.jpg', '.jpeg', '.ico', '.webp', '.pt') -or $entry.Source.StartsWith('runtime/')) {
+                    $contentBytes = [System.IO.File]::ReadAllBytes($sourcePath)
+                }
+                else {
+                    # Normalize text only; media assets must retain their exact bytes.
+                    $content = [System.IO.File]::ReadAllText($sourcePath)
+                    $content = $content.Replace("`r`n", "`n").Replace("`r", "`n")
+                    $contentBytes = $releaseUtf8.GetBytes($content)
+                }
                 $entryStream.Write($contentBytes, 0, $contentBytes.Length)
             }
             finally {
@@ -216,6 +246,19 @@ try {
                 Where-Object { -not [string]::IsNullOrEmpty($_.Name) } |
                 ForEach-Object { $_.FullName.Replace("\", "/") }
         )
+        foreach ($entry in $releaseFiles) {
+            if ([System.IO.Path]::GetExtension($entry.Source) -notin @('.png', '.jpg', '.jpeg', '.ico', '.webp')) { continue }
+            $assetStream = $archive.GetEntry($entry.Archive).Open()
+            $assetBytes = [System.IO.MemoryStream]::new()
+            try {
+                $assetStream.CopyTo($assetBytes)
+                $sourceBytes = [System.IO.File]::ReadAllBytes((Join-Path $pluginRoot $entry.Source))
+                if ([Convert]::ToBase64String($sourceBytes) -cne [Convert]::ToBase64String($assetBytes.ToArray())) {
+                    throw "Release asset bytes differ from source: $($entry.Source)"
+                }
+            }
+            finally { $assetStream.Dispose(); $assetBytes.Dispose() }
+        }
     }
     finally {
         $archive.Dispose()
