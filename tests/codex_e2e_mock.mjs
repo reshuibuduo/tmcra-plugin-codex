@@ -214,7 +214,9 @@ async function test(name, callback) {
   results.push({ name, ok: true, elapsedMs: Date.now() - started });
 }
 
-async function waitFor(predicate, { timeoutMs = 8_000, intervalMs = 50 } = {}) {
+// Detached worker startup on shared Windows CI includes scheduler/antivirus delay.
+// This is an eventual-delivery contract, not a production latency assertion.
+async function waitFor(predicate, { timeoutMs = process.env.CI ? 20_000 : 8_000, intervalMs = 50 } = {}) {
   const deadline = Date.now() + timeoutMs;
   while (!(await predicate())) {
     if (Date.now() >= deadline) throw new Error(`condition did not become true within ${timeoutMs}ms`);

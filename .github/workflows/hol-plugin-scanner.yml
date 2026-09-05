@@ -36,3 +36,16 @@ jobs:
           fail_on_severity: high
           format: sarif
           upload_sarif: true
+      - name: Show scanner findings even when the gate fails
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("ai-plugin-scanner.sarif")
+          if path.is_file():
+              report = json.loads(path.read_text())
+              for run in report.get("runs", []):
+                  for result in run.get("results", []):
+                      print(json.dumps({key: result.get(key) for key in ("ruleId", "level", "message", "locations")}, ensure_ascii=True))
+          PY
