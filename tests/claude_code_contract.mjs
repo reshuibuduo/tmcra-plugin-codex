@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { strict as assert } from "node:assert";
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -16,7 +17,7 @@ import { pairingTurnId } from "../hooks/hook_common.mjs";
 const testDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = resolve(testDir, "..");
 const hooksDir = join(pluginRoot, "hooks");
-const token = "tmcra-claude-contract-token";
+const token = randomUUID();
 const tempRoot = await mkdtemp(join(tmpdir(), "tmcra-claude-contract-"));
 const project = join(tempRoot, "project");
 const dataDir = join(tempRoot, "claude-plugin-data");

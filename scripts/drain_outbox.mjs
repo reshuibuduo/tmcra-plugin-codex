@@ -97,7 +97,7 @@ async function acquireLock() {
 }
 
 async function drain() {
-  if (!(await acquireLock())) return;
+  if (!(await acquireLock())) return false;
   await rm(launchPath, { force: true });
   await rm(requestPath, { force: true });
   const startedAt = Date.now();
@@ -250,6 +250,10 @@ async function drain() {
         }
         try {
           const result = await submitOutboxTurn(entry, config);
+          if (result.skipped) {
+            await appendLog("ingest_discarded", { outboxId: entry.outboxId, reason: result.reason });
+            continue;
+          }
           const submitted = await markOutboxSubmitted(entry, result);
           await clearOutboxCircuit(entry);
           inFlightJobs += 1;
@@ -333,4 +337,10 @@ async function drain() {
   }
 }
 
-await drain();
+// Release the lock before the final request check. A producer that observed
+// this worker either leaves a signal we consume here, or notices the released
+// lock in its own post-signal check and launches a replacement.
+let ownedDrain;
+do {
+  ownedDrain = await drain();
+} while (ownedDrain !== false && await hasDrainRequest());

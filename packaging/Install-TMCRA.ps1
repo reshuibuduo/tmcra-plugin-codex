@@ -9,7 +9,9 @@ param(
     [switch]$SkipPluginInstall,
     [switch]$NoBrowser,
     [switch]$ProgressJson,
-    [switch]$ApiOnlyCheck
+    [switch]$ApiOnlyCheck,
+    [switch]$LocalMemory,
+    [ValidateSet('lite-cpu','balanced-bge','quality-qwen')][string]$LocalProfile = 'lite-cpu'
 )
 
 $ErrorActionPreference = "Stop"

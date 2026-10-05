@@ -1,6 +1,6 @@
 {
   "name": "tmcra-memory",
-  "version": "0.3.0-rc.10",
+  "version": "1.0.0-rc.1",
   "description": "Automatic long-term memory recall and capture for Codex.",
   "author": {
     "name": "TMCRA",
@@ -29,10 +29,7 @@
     ],
     "defaultPrompt": [
       "Show the TMCRA memories that were injected for my latest completed answer.",
-      "Show which TMCRA memories are relevant to this task.",
-      "Remember this decision for future coding sessions.",
-      "Check whether the latest TMCRA memory write completed.",
-      "Show TMCRA installation and lifecycle status.",
+      "Open the memory control panel for this session.",
       "Open TMCRA local Writer and background-organizer settings."
     ],
     "brandColor": "#49E5C2",

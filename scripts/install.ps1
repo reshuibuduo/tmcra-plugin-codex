@@ -9,7 +9,9 @@ param(
     [switch]$SkipPluginInstall,
     [switch]$NoBrowser,
     [switch]$ProgressJson,
-    [switch]$ApiOnlyCheck
+    [switch]$ApiOnlyCheck,
+    [switch]$LocalMemory,
+    [ValidateSet('lite-cpu','balanced-bge','quality-qwen')][string]$LocalProfile = 'lite-cpu'
 )
 
 $ErrorActionPreference = "Stop"
@@ -276,7 +278,12 @@ try {
         Repair-CodexRuntime $codex ([ref]$codexBackup)
     }
 
-    if (-not $SkipConfigure) {
+    if ($LocalMemory) {
+        $localInstaller = Join-Path $pluginRoot 'runtime\memory-api\deploy\Install-TmcraLocal.ps1'
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $localInstaller -Profile $LocalProfile -WaitReady
+        if ($LASTEXITCODE -ne 0) { throw 'Local memory installation did not reach ready; cloud authorization was not attempted.' }
+    }
+    if (-not $SkipConfigure -and -not $LocalMemory) {
         # Older installers granted read/write without delete, which prevents the
         # atomic credential replacement used by device authorization.
         Protect-TmcraConfig $configPath
@@ -327,7 +334,8 @@ try {
     }
     if ($checkExitCode -ne 0) { throw "TMCRA configuration check failed." }
 
-    Write-Host "TMCRA Memory is installed and authorized in Codex Desktop. In Codex, run /hooks, trust all nine TMCRA lifecycle hooks, then start a new task and ask TMCRA to show status."
+    if ($LocalMemory) { Write-Host "TMCRA Memory is installed with a private local identity. Restart Codex, review the nine lifecycle hooks with /hooks, then start a new task." }
+    else { Write-Host "TMCRA Memory is installed and authorized in Codex Desktop. In Codex, run /hooks, review the nine lifecycle hooks, then start a new task and ask TMCRA to show status." }
     if ($codexBackup) { Write-Host "Codex configuration backup: $codexBackup" }
 }
 catch {

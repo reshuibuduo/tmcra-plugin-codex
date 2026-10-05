@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
@@ -9,7 +10,7 @@ const previousEnvironment = new Map();
 const testEnvironment = {
   PLUGIN_DATA: root,
   TMCRA_BASE_URL: "http://localhost:0",
-  TMCRA_API_KEY: "regression-test-token",
+  TMCRA_API_KEY: randomUUID(),
   TMCRA_GLOBAL_SCOPE: "global-test",
   TMCRA_PROJECT_SCOPE: "project-test",
   TMCRA_PROJECT_SCOPE_PREFIX: "project",

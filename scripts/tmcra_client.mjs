@@ -4,10 +4,12 @@ import { appendFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile
 import { homedir } from "node:os";
 import { basename, dirname, join, parse, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { activeLocalConfigPath, assertActiveMemoryConnection } from "./local_binding.mjs";
 
 import {
   providerStageReady,
   readProviderConfig,
+  normalizeProviderBaseUrl,
 } from "./provider_config.mjs";
 
 const DEFAULT_BASE_URL = "https://api.tmcra.com";
@@ -124,6 +126,7 @@ export function pluginDataDir() {
 export async function loadConfig({ requireApiKey = true } = {}) {
   const candidates = [
     process.env.TMCRA_CONFIG_FILE,
+    await activeLocalConfigPath(),
     process.env.PLUGIN_DATA ? join(process.env.PLUGIN_DATA, "config.json") : null,
     process.env.CLAUDE_PLUGIN_DATA
       ? join(process.env.CLAUDE_PLUGIN_DATA, "config.json")
@@ -147,6 +150,7 @@ export async function loadConfig({ requireApiKey = true } = {}) {
     fileConfig.default_scope ||
     DEFAULT_SCOPE_NAMESPACE;
   const config = {
+    deploymentMode: fileConfig.deploymentMode === "local" ? "local" : "service",
     baseUrl:
       process.env.TMCRA_BASE_URL ||
       process.env.CLAUDE_PLUGIN_OPTION_API_ENDPOINT ||
@@ -224,6 +228,18 @@ export async function loadConfig({ requireApiKey = true } = {}) {
         120_000,
     ),
   };
+  if (config.deploymentMode === "local") {
+    // An explicit local binding owns the service identity; inherited cloud
+    // credentials/endpoints cannot override it.
+    config.baseUrl = fileConfig.baseUrl;
+    config.apiKey = fileConfig.apiKey;
+    config.globalScope = fileConfig.globalScope;
+    config.projectScopePrefix = fileConfig.projectScopePrefix;
+    const localUrl = new URL(config.baseUrl);
+    if (localUrl.protocol !== "http:" || !["127.0.0.1", "[::1]"].includes(localUrl.hostname)
+      || !localUrl.port || localUrl.username || localUrl.password || localUrl.search || localUrl.hash || localUrl.pathname !== "/")
+      throw new Error("Full-local memory requires a numeric loopback service URL");
+  }
   config.baseUrl = String(config.baseUrl).replace(/\/+$/u, "");
   config.scopeNamespace = config.scopeNamespace.trim();
   config.globalScope = config.globalScope.trim();
@@ -231,9 +247,7 @@ export async function loadConfig({ requireApiKey = true } = {}) {
   config.projectScope = config.projectScope.trim();
   config.integrationId = config.integrationId.trim();
   config.agentId = config.agentId.trim();
-  if (!config.baseUrl.startsWith("https://") && !config.baseUrl.startsWith("http://localhost")) {
-    throw new Error("TMCRA_BASE_URL must use HTTPS (or localhost for development)");
-  }
+  config.baseUrl = normalizeProviderBaseUrl(config.baseUrl, "TMCRA_BASE_URL");
   if (!config.scopeNamespace || !config.globalScope || !config.projectScopePrefix) {
     throw new Error("TMCRA scope namespace, global scope, and project prefix are required");
   }
@@ -286,10 +300,12 @@ export async function request(
   const maxAttempts = Number.isInteger(attempts) && attempts >= 1 && attempts <= 3 ? attempts : 2;
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    await assertActiveMemoryConnection(resolved);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), resolved.timeoutMs);
     try {
       const response = await fetch(`${resolved.baseUrl}${path}`, {
+        ...(resolved.deploymentMode === "local" ? { redirect: "error" } : {}),
         method,
         headers: {
           Authorization: `${resolved.tokenType || "Bearer"} ${resolved.apiKey}`,
@@ -351,8 +367,9 @@ function encodedScope(scope) {
   return encodeURIComponent(scope);
 }
 
-async function localProviderExecutionHeaders(stage) {
+export async function localProviderExecutionHeaders(stage, config) {
   try {
+    if ((config || await loadConfig({ requireApiKey: false })).deploymentMode === "local") return {};
     const local = await readProviderConfig();
     if (!local || !providerStageReady(local, stage)) return {};
     return stage === "writer"
@@ -421,8 +438,8 @@ export async function ingest({
     metadata: metadata || {},
   };
   const [writerProviderHeaders, organizerProviderHeaders] = await Promise.all([
-    localProviderExecutionHeaders("writer"),
-    localProviderExecutionHeaders("organizer"),
+    localProviderExecutionHeaders("writer", config),
+    localProviderExecutionHeaders("organizer", config),
   ]);
   return request(`/v1/scopes/${encodedScope(scope)}/ingest`, {
     method: "POST",
@@ -455,7 +472,7 @@ export async function retryJob(jobId, { idempotencyKey, config } = {}) {
 
 export async function consolidate({ scope, idempotencyKey, config } = {}) {
   if (!scope) throw new Error("scope is required for consolidation");
-  const providerHeaders = await localProviderExecutionHeaders("organizer");
+  const providerHeaders = await localProviderExecutionHeaders("organizer", config);
   return request(`/v1/scopes/${encodedScope(scope)}/consolidate`, {
     method: "POST",
     config,
@@ -864,6 +881,7 @@ export async function saveRecallReceipt(value) {
       requestId: value.global?.requestId ? String(value.global.requestId) : null,
       count: Number.isInteger(value.global?.count) ? value.global.count : 0,
       content: String(value.global?.content || "").slice(0, 200_000),
+      sources: value.global?.sources || [],
     },
     project: {
       status: String(value.project?.status || "unknown"),
@@ -871,6 +889,7 @@ export async function saveRecallReceipt(value) {
       requestId: value.project?.requestId ? String(value.project.requestId) : null,
       count: Number.isInteger(value.project?.count) ? value.project.count : 0,
       content: String(value.project?.content || "").slice(0, 200_000),
+      sources: value.project?.sources || [],
     },
   };
   await Promise.all([
@@ -980,6 +999,14 @@ async function saveOutboxReceipt(entry, value) {
     updatedAt: new Date().toISOString(),
   };
   await atomicWrite(outboxReceiptPath(entry.outboxId), receipt);
+  if (entry.capture) {
+    try {
+      const { recordMemoryActivity } = await import("./memory_controls.mjs");
+      await recordMemoryActivity(entry.capture, { kind: "write", outboxId: entry.outboxId, jobId: receipt.jobId, state: receipt.state });
+    } catch {
+      await appendLog("memory_panel_delivery_update_deferred", { outboxId: entry.outboxId });
+    }
+  }
   await updateRecallIngestState(entry, {
     state: receipt.state,
     submittedAt: receipt.submittedAt,
@@ -1482,6 +1509,24 @@ export async function removeOutboxTurn(outboxId, { expectedIdempotencyKey = null
 }
 
 export async function submitOutboxTurn(entry, config) {
+  if (!entry.capture) {
+    const { controlKey, legacyWriteAllowed } = await import("./memory_controls.mjs");
+    if (!await legacyWriteAllowed(controlKey(config, entry.scope), {
+      sessionId: entry.receiptBinding?.sessionId, sessionHash: entry.metadata?.source_session_id_hash,
+    })) {
+      await saveOutboxReceipt(entry, { state: "discarded", errorCode: "legacy_memory_mode_changed", completedAt: new Date().toISOString() });
+      await removeOutboxTurn(entry.outboxId, { expectedIdempotencyKey: entry.idempotencyKey });
+      return { skipped: true, reason: "legacy_memory_mode_changed" };
+    }
+  }
+  if (entry.capture) {
+    const { mayWrite } = await import("./memory_controls.mjs");
+    if (!await mayWrite(entry.capture)) {
+      await saveOutboxReceipt(entry, { state: "discarded", errorCode: "memory_mode_changed", completedAt: new Date().toISOString() });
+      await removeOutboxTurn(entry.outboxId, { expectedIdempotencyKey: entry.idempotencyKey });
+      return { skipped: true, reason: "memory_mode_changed" };
+    }
+  }
   return ingest({
     config,
     scope: entry.scope,
