@@ -27,8 +27,8 @@ const testsDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = resolve(testsDir, "..");
 const scriptsDir = join(pluginRoot, "scripts");
 const hooksDir = join(pluginRoot, "hooks");
-const validToken = "tmcra-test-valid-token";
-const invalidToken = "tmcra-test-invalid-token";
+const validToken = randomUUID();
+const invalidToken = randomUUID();
 const sensitiveValues = new Set([validToken, invalidToken]);
 const capturedOutput = [];
 

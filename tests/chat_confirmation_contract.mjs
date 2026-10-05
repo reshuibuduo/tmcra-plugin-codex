@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,7 +11,7 @@ import { createMemoryActions } from '../scripts/memory_center.mjs';
 
 const root=await mkdtemp(join(tmpdir(),'tmcra-chat-confirm-'));process.env.TMCRA_MEMORY_STATE_DIR=join(root,'controls');
 const posts=[];const http=createServer(async(req,res)=>{let body='';for await(const chunk of req)body+=chunk;if(req.method==='POST'&&req.url.endsWith('/feedback'))posts.push({path:req.url,body:JSON.parse(body),key:req.headers['idempotency-key']});res.writeHead(201,{'Content-Type':'application/json'});res.end(JSON.stringify({effective:true,correction_index_status:'pending'}));});
-await new Promise(r=>http.listen(0,'127.0.0.1',r));const config={baseUrl:`http://127.0.0.1:${http.address().port}`,apiKey:'isolated-chat-test-key'};
+await new Promise(r=>http.listen(0,'127.0.0.1',r));const config={baseUrl:`http://127.0.0.1:${http.address().port}`,apiKey:randomUUID()};
 await writeFile(join(root,'config.json'),JSON.stringify({...config,globalScope:'test-global',projectScopePrefix:'test-project'}));
 const env={...process.env,TMCRA_CONFIG_FILE:join(root,'config.json'),TMCRA_BASE_URL:config.baseUrl,TMCRA_API_KEY:config.apiKey,PLUGIN_DATA:join(root,'plugin'),TMCRA_LOCAL_PROVIDER_CONFIG:join(root,'absent-provider.json')};
 function client(capabilities,answer){

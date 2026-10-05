@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +11,7 @@ export async function memoryCenterFixture({ empty = false, providerTestConfig } 
   const root = await mkdtemp(join(tmpdir(), "tmcra-workspace-preview-"));
   process.env.TMCRA_MEMORY_STATE_DIR = root;
   if (providerTestConfig) await writeProviderConfig({writer:{provider:'openai-compatible',...providerTestConfig},organizer:{inheritWriter:true}},join(root,'providers.json'));
-  const config = { baseUrl: "https://example.invalid", apiKey: "never-visible-test-secret" };
+  const config = { baseUrl: "https://example.invalid", apiKey: randomUUID() };
   const scope = "tmcra / 插件研发";
   const sessionId = "local-design-preview";
   const key = controlKey(config, scope);

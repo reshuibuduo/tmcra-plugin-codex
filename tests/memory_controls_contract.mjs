@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,11 +11,11 @@ import { saveOutboxTurn, submitOutboxTurn, listOutboxTurns } from "../scripts/tm
 const root = await mkdtemp(join(tmpdir(), "tmcra-controls-contract-"));
 process.env.TMCRA_MEMORY_STATE_DIR = join(root, "controls");
 process.env.PLUGIN_DATA = join(root, "plugin");
-const config = { apiKey: "isolated-test-credential", baseUrl: "http://localhost:1" };
+const config = { apiKey: randomUUID(), baseUrl: "http://localhost:1" };
 const key = controlKey(config, "project-a");
 let center;
 try {
-  assert.notEqual(key, controlKey({ ...config, apiKey: "different-account" }, "project-a"));
+  assert.notEqual(key, controlKey({ ...config, apiKey: randomUUID() }, "project-a"));
   assert.notEqual(key, controlKey(config, "project-b"));
   const first = await memoryPolicy(key, "session-a");
   assert.equal(await mayWrite(first), true);
@@ -74,7 +75,9 @@ try {
   const text = await response.text(); assert.equal(response.status, 200); assert.ok(!text.includes(config.apiKey));
   assert.equal((await memoryDashboard(key, "session-a")).policy.mode, "normal");
   for (const path of await readdir(process.env.TMCRA_MEMORY_STATE_DIR)) {
-    assert.doesNotMatch(await readFile(join(process.env.TMCRA_MEMORY_STATE_DIR, path), "utf8"), /PRIVATE-READONLY-TURN|PRIVATE-OFF-TURN|isolated-test-credential/u);
+    const stored = await readFile(join(process.env.TMCRA_MEMORY_STATE_DIR, path), "utf8");
+    assert.doesNotMatch(stored, /PRIVATE-READONLY-TURN|PRIVATE-OFF-TURN/u);
+    assert.equal(stored.includes(config.apiKey), false, "memory state must not contain the credential");
   }
   console.log(JSON.stringify({ ok: true, controls: true, continuation: true, budget: true, noBackfill: true, outbox: true, loopback: true }));
 } finally {

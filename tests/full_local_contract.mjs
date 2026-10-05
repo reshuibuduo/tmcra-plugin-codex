@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, copyFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,17 +8,19 @@ import { executeAvailableProviderTasks } from "../scripts/provider_executor.mjs"
 import { assertActiveMemoryConnection, assertCloudProvidersAllowed } from "../scripts/local_binding.mjs";
 
 const root = await mkdtemp(join(tmpdir(), "tmcra-local-contract-"));
+const localCredential = randomUUID();
+const cloudCredential = randomUUID();
 const previous = { ...process.env };
 try {
   const path = join(root, "local.json");
   await writeFile(path, JSON.stringify({ deploymentMode: "local", baseUrl: "http://127.0.0.1:2009",
-    apiKey: "synthetic-local-key", globalScope: "local-global", projectScopePrefix: "local-project" }));
+    apiKey: localCredential, globalScope: "local-global", projectScopePrefix: "local-project" }));
   process.env.TMCRA_CONFIG_FILE = path;
   process.env.TMCRA_BASE_URL = "https://cloud.example.invalid";
-  process.env.TMCRA_API_KEY = "synthetic-cloud-key";
+  process.env.TMCRA_API_KEY = cloudCredential;
   const config = await loadConfig();
   assert.equal(config.baseUrl, "http://127.0.0.1:2009");
-  assert.equal(config.apiKey, "synthetic-local-key");
+  assert.equal(config.apiKey, localCredential);
   assert.deepEqual(await localProviderExecutionHeaders("writer", config), {});
   assert.deepEqual(await localProviderExecutionHeaders("organizer", config), {});
   let calls = 0;
@@ -32,9 +35,9 @@ try {
   await writeFile(process.env.TMCRA_LOCAL_BINDING_FILE, JSON.stringify({ schemaVersion: 1, mode: "local", dataRoot: root, profile: "lite-cpu" }));
   await assert.rejects(() => loadConfig(), /ENOENT/);
   await copyFile(path, join(secrets, "client-plugin.json"));
-  assert.equal((await loadConfig()).apiKey, "synthetic-local-key");
+  assert.equal((await loadConfig()).apiKey, localCredential);
   await assertActiveMemoryConnection(config);
-  await assert.rejects(() => assertActiveMemoryConnection({ baseUrl: "https://cloud.example.invalid", apiKey: "synthetic-cloud-key" }), /blocked/);
+  await assert.rejects(() => assertActiveMemoryConnection({ baseUrl: "https://cloud.example.invalid", apiKey: cloudCredential }), /blocked/);
   await assert.rejects(() => assertCloudProvidersAllowed(), /blocked/);
   process.env.TMCRA_CONFIG_FILE = path;
   await writeFile(path, JSON.stringify({ deploymentMode: "local", baseUrl: "https://cloud.example.invalid" }));
