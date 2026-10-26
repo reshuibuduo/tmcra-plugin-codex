@@ -1,13 +1,15 @@
 # TMCRA Memory for Codex
 
-TMCRA Memory adds automatic long-term memory to Codex through the public TMCRA API. It does not require access to the TMCRA server.
+TMCRA Memory adds automatic long-term memory to Codex through a local Memory API or the hosted TMCRA service. Windows local installation runs independently of TMCRA servers and accounts.
 
 This repository is the standalone distribution mirror of the plugin maintained in the [TMCRA monorepo](https://github.com/reshuibuduo/tmcra/tree/main/07-tmcra-codex-plugins/tmcra-memory). Download the versioned ZIP and its SHA-256 file from [GitHub Releases](https://github.com/reshuibuduo/tmcra-plugin-codex/releases).
 
 ## What it does
 
+Version 1.0.0-rc.1 adds session controls, task handoff, bounded evidence selection and a loopback memory control panel. See [the control contract and rollout checklist](docs/memory-controls.md). `tmcra_open_memory_center(session_id, project_path)` opens the panel; `tmcra_memory_control` exposes the same actions to explicit tools. Effective source corrections require the matching backend update, included in the local runtime.
+
 - Initializes the global/project scope at `SessionStart` without recalling or injecting memory.
-- Recalls relevant global and project memory only after `UserPromptSubmit`, using the current prompt as the query.
+- Recalls relevant global and project memory after `UserPromptSubmit`; short continuations use the bound task objective and observed progress.
 - Includes both user records (requirements and facts) and assistant records (Codex work progress and results) in recall, while keeping their actor and provenance labels separate.
 - Applies authority in this order: current user instruction, historical user requirements/facts, then historical Codex progress/results. Assistant records never become user statements.
 - Captures the completed user/assistant turn at `Stop`.
@@ -24,6 +26,12 @@ Automatic recall stays out of the way during normal work. After Codex finishes a
 Codex Hooks do not expose a third-party custom side panel. The explicit inspection tool is therefore the in-Codex audit surface; the TMCRA desktop application can provide a longer activity history separately.
 
 ## Windows installation
+
+For server-independent installation, extract the release ZIP and double-click **`Install-Local.cmd`**. It registers the plugin, installs a private Python runtime, downloads verified model files, creates a local identity, and starts the local memory service. No TMCRA account, API key or preinstalled Python is required. First-time dependency/model downloads require internet access. Restart Codex and review its nine Hooks when prompted; host consent remains yours. Windows x64 is supported; the light profile needs 16 GB RAM and approximately 6.3 GiB free at startup.
+
+For the hosted service, use the account-based installer below.
+
+Marketplace users can ask “Open TMCRA local installation”; `tmcra_open_local_install` opens the same workspace without login. Downloads begin after the user chooses and confirms a profile in the page.
 
 Download the versioned release ZIP, verify the adjacent SHA-256 file, extract it to a stable local directory, then run:
 
@@ -89,6 +97,14 @@ node .\plugins\tmcra-memory\scripts\project_bootstrap.mjs import --project "D:\w
 This is a repository snapshot, not reconstructed conversation history.
 
 ## Configuration
+
+### Full-local Windows preview
+
+The workspace offers three pinned embedding/reranker profiles: E5-small + multilingual MiniLM, BGE-M3 + BGE-reranker-v2-m3, and Qwen3-Embedding-4B + Qwen3-Reranker-0.6B.
+
+The release and marketplace packages include the actual backend with a SHA-256 inventory. Use `Install-Local.cmd`, or run `node scripts/local_setup.mjs` from the plugin directory to open the installation page without login. Python and model files are downloaded automatically. The installer registers a private local selection; Codex, DSH and generic TMCRA MCP discover it after restarting their host. Existing cloud credentials remain stored, while stale cloud memory connections and background model requests are blocked after local selection. Failed setup keeps this local selection. Advanced `TMCRA_CONFIG_FILE` overrides must be cleared before automatic installation. A standalone [runtime package](https://github.com/reshuibuduo/tmcra/releases/tag/v1.0.0-rc.1) serves other MCP hosts.
+
+Acceptance is partial: synthetic CPU ingest took 112 seconds and raw recall 0.52 seconds; complex compilation timed out at 600 seconds. Organizer and full-service restart recovery remain unverified. Lightweight startup requires approximately 6.3 GiB free memory. See the [acceptance record](https://github.com/reshuibuduo/tmcra/blob/v1.0.0-rc.1/docs/LOCAL_DEPLOYMENT_PREVIEW.zh-CN.md). A cloud-hosted agent can still send recalled evidence to its own model provider.
 
 ### Local Writer and background organizer
 

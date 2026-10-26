@@ -237,26 +237,34 @@ export async function probeProvider(stage, input, {
   path = resolveProviderConfigPath(),
   fetchImpl = fetch,
   timeoutMs = 15_000,
+  mode = "models",
 } = {}) {
+  if (!["models", "inference"].includes(mode)) throw new Error("Unknown provider test mode");
   const previous = await readProviderConfig(path);
   const normalized = normalizeProviderConfig(input, previous ?? undefined);
   const target = resolvedProviderStage(normalized, stage);
   if (!target.apiKey && !loopbackHost(new URL(target.baseUrl).hostname)) {
     throw new Error(`${stage} API key is required for a remote provider`);
   }
-  const url = `${target.baseUrl}/models`;
+  const url = `${target.baseUrl}/${mode === "inference" ? "chat/completions" : "models"}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const started = performance.now();
   try {
     const response = await fetchImpl(url, {
-      method: "GET",
+      method: mode === "inference" ? "POST" : "GET",
       headers: {
         Accept: "application/json",
+        ...(mode === "inference" ? { "Content-Type": "application/json" } : {}),
         ...(target.apiKey ? { Authorization: `Bearer ${target.apiKey}` } : {}),
       },
       redirect: "error",
       signal: controller.signal,
+      ...(mode === "inference" ? { body: JSON.stringify({ model: target.model,
+        messages: [{ role: "user", content: `Synthetic TMCRA ${stage} connectivity test. Reply with the JSON object {"ok":true,"stage":"${stage}"} and nothing else.` }],
+        max_tokens: 2048, temperature: 0, response_format: { type: "json_object" },
+        ...(target.provider === "deepseek" ? { thinking: { type: "disabled" }, enable_thinking: false } : {}),
+      }) } : {}),
     });
     const text = await response.text();
     if (!response.ok) throw new Error(`provider returned HTTP ${response.status}`);
@@ -269,11 +277,18 @@ export async function probeProvider(stage, input, {
     const modelIds = Array.isArray(payload?.data)
       ? payload.data.map((item) => String(item?.id ?? "")).filter(Boolean)
       : [];
+    if (mode === "inference") {
+      let answer;
+      try { answer = JSON.parse(payload?.choices?.[0]?.message?.content || ""); } catch { throw new Error("模型响应未通过 JSON 结构校验，请检查模型和输出参数。"); }
+      if (answer.ok !== true || answer.stage !== stage || payload?.choices?.[0]?.finish_reason !== "stop") throw new Error("模型响应不完整或未通过测试样本校验。");
+    }
     return {
       ok: true,
       stage,
       endpoint: new URL(target.baseUrl).origin,
       model: target.model,
+      testMode: mode,
+      ...(mode === "inference" ? { servedModel: String(payload.model || target.model).slice(0, 512), inferenceValidated: true, syntheticDataOnly: true } : {}),
       modelVisible: modelIds.length === 0 ? null : modelIds.includes(target.model),
       latencyMs: Math.max(0, Math.round(performance.now() - started)),
     };

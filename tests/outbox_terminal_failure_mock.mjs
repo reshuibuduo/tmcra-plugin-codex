@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import http from "node:http";
@@ -63,7 +64,7 @@ try {
         ...process.env,
         PLUGIN_DATA: root,
         TMCRA_BASE_URL: `http://localhost:${address.port}`,
-        TMCRA_API_KEY: "test-key",
+        TMCRA_API_KEY: randomUUID(),
         TMCRA_OUTBOX_JOB_POLL_MS: "50",
       },
       stdio: "inherit",

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0-rc.1 - 2026-09-06
+
+- Add the redesigned memory workspace, local Writer/organizer settings, knowledge and graph views, session controls, task continuity, and bounded recall budgets.
+- Require interactive host confirmation for conversational memory corrections; protect the correction discussion from automatic capture and replay.
+- Add three pinned embedding/reranker profiles and Windows local-runtime preview controls. Local identity disables inherited cloud-provider task handoff.
+- Preserve binary image bytes in release ZIPs and verify packaged assets against their sources.
+- Bundle the verified backend, automatic private Python bootstrap and shared local identity discovery. `Install-Local.cmd` installs without TMCRA servers/accounts. Runtime files survive plugin-cache updates; stale cloud connections are blocked after local selection.
+- Full-local acceptance remains partial: CPU ingest/raw recall passed; complex compilation timed out, with organizer and restart recovery still pending. Production is unchanged.
+
 ## 0.3.0-rc.10 - 2026-09-04
 
 - Include the icon and overview image referenced by the Codex marketplace manifest in every release archive.

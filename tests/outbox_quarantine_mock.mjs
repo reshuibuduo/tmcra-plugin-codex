@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import http from "node:http";
@@ -129,7 +130,7 @@ async function runDrain() {
         ...process.env,
         PLUGIN_DATA: root,
         TMCRA_BASE_URL: `http://localhost:${address.port}`,
-        TMCRA_API_KEY: "test-key",
+        TMCRA_API_KEY: randomUUID(),
         TMCRA_OUTBOX_CIRCUIT_MIN_MS: "50",
         TMCRA_OUTBOX_CIRCUIT_MAX_MS: "1000",
         TMCRA_OUTBOX_SUPPORT_RECHECK_MS: "50",

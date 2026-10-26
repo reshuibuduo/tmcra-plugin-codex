@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { appendLog, loadConfig, request } from "./tmcra_client.mjs";
+import { assertCloudProvidersAllowed } from "./local_binding.mjs";
 import {
   providerStageReady,
   readProviderConfig,
@@ -222,6 +223,7 @@ async function providerCompletion(target, task, { fetchImpl = fetch, signal } = 
     }
     let response;
     try {
+      await assertCloudProvidersAllowed();
       response = await fetchImpl(`${target.baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -413,6 +415,7 @@ export async function executeAvailableProviderTasks({
     : providerConfig;
   if (!local) return { executed: 0 };
   const serviceConfig = config || await loadConfig();
+  if (serviceConfig.deploymentMode === "local") return { executed: 0, reason: "resident-local-runtime" };
   let executed = 0;
   let stageCursor = 0;
   for (let index = 0; index < maxTasks; index += 1) {

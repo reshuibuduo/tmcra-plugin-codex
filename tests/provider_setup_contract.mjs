@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, stat } from "node:fs/promises";
@@ -13,11 +14,13 @@ import {
 } from "../scripts/provider_config.mjs";
 import { startProviderSetupServer } from "../scripts/provider_setup.mjs";
 
+const providerCredential = randomUUID();
+
 const root = await mkdtemp(join(tmpdir(), "tmcra-provider-setup-"));
 const configPath = join(root, "用户 配置", "local-providers.json");
 const provider = createServer((request, response) => {
   assert.equal(request.url, "/v1/models");
-  assert.equal(request.headers.authorization, "Bearer local-probe-credential");
+  assert.equal(request.headers.authorization, `Bearer ${providerCredential}`);
   response.writeHead(200, { "Content-Type": "application/json" });
   response.end(JSON.stringify({ data: [{ id: "writer-model" }, { id: "organizer-model" }] }));
 });
@@ -59,7 +62,7 @@ try {
         provider: "local-openai-compatible",
         baseUrl: providerBaseUrl,
         model: "writer-model",
-        apiKey: "local-probe-credential",
+        apiKey: providerCredential,
       },
       organizer: { inheritWriter: true },
     }),
@@ -67,7 +70,7 @@ try {
   const saved = await savedResponse.json();
   assert.equal(savedResponse.status, 200, JSON.stringify(saved));
   assert.equal(saved.config.writer.credentialPresent, true);
-  assert.equal(JSON.stringify(saved).includes("local-probe-credential"), false);
+  assert.equal(JSON.stringify(saved).includes(providerCredential), false);
 
   const testedResponse = await fetch(`${setup.baseUrl}/api/test`, {
     method: "POST",
@@ -91,10 +94,10 @@ try {
   assert.equal(tested.modelVisible, true);
 
   const stored = await readProviderConfig(configPath);
-  assert.equal(stored.writer.apiKey, "local-probe-credential");
+  assert.equal(stored.writer.apiKey, providerCredential);
   assert.equal(stored.organizer.inheritWriter, true);
-  assert.equal(JSON.stringify(publicProviderConfig(stored)).includes("local-probe-credential"), false);
-  assert.equal((await readFile(configPath, "utf8")).includes("local-probe-credential"), true);
+  assert.equal(JSON.stringify(publicProviderConfig(stored)).includes(providerCredential), false);
+  assert.equal((await readFile(configPath, "utf8")).includes(providerCredential), true);
   if (process.platform === "win32") {
     const acl = spawnSync("icacls.exe", [configPath], { encoding: "utf8", windowsHide: true });
     assert.equal(acl.status, 0, acl.stderr || acl.stdout);

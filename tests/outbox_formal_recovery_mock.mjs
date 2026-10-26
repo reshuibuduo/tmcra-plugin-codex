@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -48,7 +49,7 @@ await new Promise((resolve) => server.listen(0, "localhost", resolve));
 const address = server.address();
 assert(address && typeof address === "object");
 const config = {
-  apiKey: "test-key",
+  apiKey: randomUUID(),
   baseUrl: `http://localhost:${address.port}`,
   timeoutMs: 5_000,
 };

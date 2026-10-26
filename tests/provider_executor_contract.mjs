@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { executeAvailableProviderTasks } from "../scripts/provider_executor.mjs";
+
+const serviceCredential = randomUUID();
+const providerCredential = randomUUID();
 
 const root = await mkdtemp(join(tmpdir(), "tmcra-provider-executor-"));
 process.env.PLUGIN_DATA = root;
@@ -71,7 +74,7 @@ const serviceRequests = [];
 const completions = [];
 const service = createServer((request, response) => {
   void (async () => {
-    assert.equal(request.headers.authorization, "Bearer service-device-token");
+    assert.equal(request.headers.authorization, `Bearer ${serviceCredential}`);
     const body = await readJson(request);
     serviceRequests.push({ url: request.url, body });
     if (request.url === "/v1/provider-tasks/claim") {
@@ -102,7 +105,7 @@ const providerRequests = [];
 const provider = createServer((request, response) => {
   void (async () => {
     assert.equal(request.url, "/v1/chat/completions");
-    assert.equal(request.headers.authorization, "Bearer provider-secret-key");
+    assert.equal(request.headers.authorization, `Bearer ${providerCredential}`);
     const body = await readJson(request);
     providerRequests.push(body);
     const requested = JSON.parse(body.messages[1].content);
@@ -139,7 +142,7 @@ try {
   const result = await executeAvailableProviderTasks({
     config: {
       baseUrl: `http://localhost:${serviceAddress.port}`,
-      apiKey: "service-device-token",
+      apiKey: serviceCredential,
       tokenType: "Bearer",
       timeoutMs: 5_000,
       integrationId: "",
@@ -150,14 +153,14 @@ try {
         provider: "openai-compatible",
         baseUrl: `http://localhost:${providerAddress.port}/v1`,
         model: "writer-model",
-        apiKey: "provider-secret-key",
+        apiKey: providerCredential,
       },
       organizer: {
         inheritWriter: false,
         provider: "openai-compatible",
         baseUrl: `http://localhost:${providerAddress.port}/v1`,
         model: "organizer-model",
-        apiKey: "provider-secret-key",
+        apiKey: providerCredential,
       },
     },
     maxTasks: 2,
@@ -167,7 +170,7 @@ try {
   assert.equal(completions.length, 2);
   assert.deepEqual(completions.map((item) => item.output.stage), ["writer", "organizer"]);
   assert.equal(JSON.stringify(completions).includes("must-stay-local"), false);
-  assert.equal(JSON.stringify(serviceRequests).includes("provider-secret-key"), false);
+  assert.equal(JSON.stringify(serviceRequests).includes(providerCredential), false);
   assert.equal(completions.every((item) => item.usage.total_tokens === 16), true);
 } finally {
   await Promise.all([close(service), close(provider)]);

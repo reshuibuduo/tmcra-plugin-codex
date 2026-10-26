@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,7 +11,7 @@ const configPath = join(root, "config.json");
 const integrationId = `int_${"c".repeat(32)}`;
 await writeFile(configPath, JSON.stringify({
   baseUrl: "https://api.tmcra.com",
-  accessToken: "device-token",
+  accessToken: randomUUID(),
   expiresAt: "2999-01-01T00:00:00.000Z",
   scopeNamespace: "personal-1",
   globalScope: "personal-1-global",

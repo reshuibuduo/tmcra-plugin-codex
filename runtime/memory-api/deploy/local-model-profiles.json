@@ -1,0 +1,132 @@
+{
+  "schema_version": "tmcra.local-model-profiles.1",
+  "verified_upstream_on": "2026-09-06",
+  "status": "windows_local_preview_partial_validation",
+  "installation_enabled": true,
+  "scope": "full_local_runtime_preview",
+  "full_memory_system_ready": false,
+  "hardware_requirements_are": "conservative_planning_estimates_not_benchmark_results",
+  "profiles": [
+    {
+      "id": "lite-cpu",
+      "name_zh": "轻量版",
+      "recommendation_zh": "普通笔记本、无独显电脑；中英文短记忆，低并发",
+      "validation": "cpu_ingest_and_raw_recall_passed_complex_compile_timed_out",
+      "system_ram_gib_min": 8,
+      "system_ram_gib_recommended_for_full_memory": 16,
+      "retrieval_vram_gib_recommended": 0,
+      "weights_bytes": 941234298,
+      "embedding": {
+        "repo_id": "intfloat/multilingual-e5-small",
+        "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+        "license": "MIT",
+        "upstream": "https://huggingface.co/intfloat/multilingual-e5-small",
+        "weights": [{"file": "model.safetensors", "bytes": 470641600, "sha256": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477"}],
+        "dimensions": 384,
+        "model_max_tokens": 512,
+        "pooling": "mean",
+        "normalize": true,
+        "query_prefix": "query: ",
+        "document_prefix": "passage: ",
+        "padding_side": "right"
+      },
+      "reranker": {
+        "repo_id": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+        "revision": "1427fd652930e4ba29e8149678df786c240d8825",
+        "license": "Apache-2.0",
+        "upstream": "https://huggingface.co/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+        "weights": [{"file": "model.safetensors", "bytes": 470592698, "sha256": "5daeca2481a76b5976a2bdc32f0a78532b6716da4f8cd3ff59460ef8d2f359b4"}],
+        "adapter": "sequence-classification",
+        "model_max_tokens": 512,
+        "tmcra_fusion_checkpoint_compatible": false
+      },
+      "required_work": ["memory_pressure_retest", "complex_compile_latency", "organizer_validation", "full_service_restart_validation"]
+    },
+    {
+      "id": "balanced-bge",
+      "name_zh": "均衡版",
+      "recommendation_zh": "优先复现现有生产检索模型；16GB 以上内存，建议有独显",
+      "validation": "production_model_stack_verified_consumer_installer_pending",
+      "system_ram_gib_min": 16,
+      "system_ram_gib_recommended_for_full_memory": 32,
+      "retrieval_vram_gib_recommended": 6,
+      "weights_bytes": 4542217682,
+      "embedding": {
+        "repo_id": "BAAI/bge-m3",
+        "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+        "license": "MIT",
+        "upstream": "https://huggingface.co/BAAI/bge-m3",
+        "weights": [{"file": "pytorch_model.bin", "bytes": 2271145830, "sha256": "b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38"}],
+        "dimensions": 1024,
+        "model_max_tokens": 8192,
+        "pooling": "cls",
+        "normalize": true,
+        "query_prefix": "",
+        "document_prefix": "",
+        "padding_side": "right"
+      },
+      "reranker": {
+        "repo_id": "BAAI/bge-reranker-v2-m3",
+        "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+        "license": "Apache-2.0",
+        "upstream": "https://huggingface.co/BAAI/bge-reranker-v2-m3",
+        "weights": [{"file": "model.safetensors", "bytes": 2271071852, "sha256": "d9e3e081faff1eefb84019509b2f5558fd74c1a05a2c7db22f74174fcedb5286"}],
+        "adapter": "sequence-classification",
+        "model_max_tokens": 8192,
+        "production_runtime_max_tokens": 1280,
+        "tmcra_fusion_checkpoint_compatible": true
+      },
+      "required_work": ["single_recall_lane", "desktop_worker_and_context_budgets", "desktop_installer", "offline_end_to_end_validation"]
+    },
+    {
+      "id": "quality-qwen",
+      "name_zh": "增强版候选",
+      "recommendation_zh": "32GB 以上内存、高显存电脑；长文本和跨语言检索候选，需与均衡版实测比较",
+      "validation": "upstream_artifacts_verified_runtime_pending",
+      "system_ram_gib_min": 32,
+      "system_ram_gib_recommended_for_full_memory": 64,
+      "retrieval_vram_gib_recommended": 16,
+      "weights_bytes": 9235180368,
+      "embedding": {
+        "repo_id": "Qwen/Qwen3-Embedding-4B",
+        "revision": "5cf2132abc99cad020ac570b19d031efec650f2b",
+        "license": "Apache-2.0",
+        "upstream": "https://huggingface.co/Qwen/Qwen3-Embedding-4B",
+        "weights": [
+          {"file": "model-00001-of-00002.safetensors", "bytes": 4965826464, "sha256": "e70bfe3c970523fb7ef4eddffed2254ce3f1e7150c3de2af4342de129dd756f8"},
+          {"file": "model-00002-of-00002.safetensors", "bytes": 3077765624, "sha256": "ed1b87c8e9eb7e535a1a155e4fd00d9f4dba80e58a6db48a4c9f82cede7079c1"}
+        ],
+        "dimensions": 2560,
+        "model_max_tokens": 32768,
+        "pooling": "last_token",
+        "normalize": true,
+        "query_prefix": "Instruct: Given a query about previous conversations, retrieve the relevant source passages.\nQuery: ",
+        "document_prefix": "",
+        "padding_side": "left"
+      },
+      "reranker": {
+        "repo_id": "Qwen/Qwen3-Reranker-0.6B",
+        "revision": "e61197ed45024b0ed8a2d74b80b4d909f1255473",
+        "license": "Apache-2.0",
+        "upstream": "https://huggingface.co/Qwen/Qwen3-Reranker-0.6B",
+        "weights": [{"file": "model.safetensors", "bytes": 1191588280, "sha256": "27cd75a405b9c1b46b59abfd88aaa209e6fed2a1972cde9b70e7659537c5e65b"}],
+        "adapter": "causal-lm-yes-no",
+        "model_max_tokens": 32768,
+        "tmcra_fusion_checkpoint_compatible": false
+      },
+      "required_work": ["qwen_yes_no_reranker_adapter", "service_variable_embedding_dimensions", "bounded_gpu_batches", "full_index_rebuild", "quality_and_latency_comparison"]
+    }
+  ],
+  "deployment_contract": {
+    "automatic_profile_switch_on_existing_index": false,
+    "cloud_fallback_in_full_local_mode": false,
+    "cloud_account_required_in_full_local_mode": false,
+    "generation_model_included_in_weights_bytes": false,
+    "model_cache_and_python_runtime_included_in_weights_bytes": false,
+    "required_index_identity": ["repo_id", "revision", "dimensions", "pooling", "query_prefix", "document_prefix", "normalization", "precision", "chunking_policy"],
+    "existing_sources_must_be_preserved": true,
+    "existing_indexes_must_be_rebuilt_before_activation": true,
+    "runtime_downloads_after_setup": false,
+    "readiness_requires_actual_inference": true
+  }
+}

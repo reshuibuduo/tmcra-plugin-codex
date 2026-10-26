@@ -1,6 +1,6 @@
 ---
 name: manage-tmcra-memory
-description: Manage and troubleshoot TMCRA long-term memory through the bundled MCP tools and Codex device authorization. Use when a user explicitly asks to remember, recall, inspect, verify, or wait for memory; configure local Writer or organizer providers; asks why a memory was used; asks to persist an important project decision; or needs to connect or reauthorize the installed Codex plugin.
+description: Manage and troubleshoot TMCRA long-term memory through bundled MCP tools and device authorization. Use when a user asks to remember, recall, inspect, verify or wait for memory; says a remembered fact is wrong, outdated or should be corrected; wants to ignore or restore a memory; configures local Writer or organizer APIs; browses the knowledge base or graph; asks why memory was used; or connects or reauthorizes the plugin.
 ---
 
 # Manage TMCRA Memory
@@ -33,6 +33,17 @@ Automatic recall and capture are handled by lifecycle hooks. Use this skill for 
 - Submit writes with `consistency=eventual` unless the next operation must immediately recall the new memory.
 - Report the returned job ID. Call `tmcra_wait_job` only when the user asks to wait or the current task requires confirmed visibility.
 
+## Conversational corrections require chat confirmation
+
+1. Recognize an actual correction request semantically: “你记错了”, “我现在用的是 B，把 A 改掉”, “这条记忆已经过时了”, “forget that wrong source”. A hypothetical feature discussion, a quote, or “I may remember it wrong” is not permission to change memory.
+2. As the first operation for a correction discussion, call `tmcra_memory_control(operation=correction_start)` with the exact host session ID and project. This vetoes automatic writeback of the current turn, including after denial. Repeat it on clarification/follow-up correction turns before other work. Unrelated older turn-identified queued writes remain eligible.
+3. Identify exact source IDs using recalled evidence or the dashboard. For “记错了” with an unclear target or no replacement, ask what was wrong and what the correct information is. Do not invent the original fact, replacement, scope, or consent.
+4. Call `operation=feedback` with exact source IDs, scope, action and user's replacement. The tool presents the original evidence, replacement and affected scope in the host chat and waits for the user. Global scope must be clearly disclosed because it affects other projects. A preceding general “OK” and a model-authored `confirmed=true` cannot approve an unseen proposal.
+5. Only the host's explicit acceptance submits feedback. Decline, dismissal, timeout or unsupported confirmation leaves the original unchanged. Explain `confirmation_unavailable` honestly; ask the user to use a host with interactive MCP elicitation. Never substitute ingestion, task summaries, shell calls or another write endpoint to bypass confirmation.
+6. A changed proposal requires a fresh confirmation. Retry the exact same accepted payload with the same idempotency key after an uncertain submission. Say the correction rule is effective only when `effective=true`; report the new content's `correction_index_status` separately. Original evidence stays in the audit history.
+
+Example question shown in chat: “原来记的是 A，现在更正为 B，影响当前项目。是否确认？”
+
 ## Inspect a write
 
 - Use `tmcra_get_job` for a single status check.
@@ -50,12 +61,18 @@ Automatic recall and capture are handled by lifecycle hooks. Use this skill for 
 
 - Call `tmcra_open_local_model_settings` when the user asks to configure the local Writer or background-organizer model provider.
 - The tool opens a temporary loopback page and returns no API Key or setup-session token. Never ask the user to paste a provider key into chat.
-- A successful connection test verifies the configured `/models` endpoint. A completed provider-task receipt proves that a production memory job used the local executor.
+- The integrated workbench tests actual inference with synthetic JSON samples, including providers without a `/models` listing. This verifies access and structured output; a completed provider-task receipt separately proves that a memory job used the local executor.
 - While the MCP process is running, ingest routes configured Writer work to the local executor and `tmcra_consolidate` routes an explicit background-organizer job. Provider credentials and raw response envelopes remain in the local user process.
 
 ## User controls
 
-- If the user asks not to save a turn, do not call ingestion for that content.
+- Call `tmcra_open_memory_center` with the exact host `session_id` and current `project_path` for the local task/source/control panel. Its temporary loopback link authorizes the local page; never store it as memory.
+- Use `tmcra_memory_control(operation=mode)` for a user-requested `normal`, `recall_only`, or `off` mode. Use the same exact host session ID in explicit recall and ingest calls. The generation boundary rejects queued older turns even after memory is reenabled; already submitted remote jobs cannot be recalled by this switch.
+- A short continuation uses the bound task objective and last result. If the dashboard lists multiple unbound active tasks, ask the user which task to continue or select the task they identified; preserve concurrent tasks.
+- Use `operation=task` to record an explicit task objective, next step, status or correction. A finished response is not evidence that the overall task is complete. Mark `completed` only when the task is actually complete and completion is intended.
+- For corrections, ignores and restores, follow the chat-confirmation workflow above. `ignore` hides a source from future recall; `restore` re-enables its recall rule. `submission_pending` requires retrying the same operation key.
+- `operation=budget` sets a character budget (1000–64000, default 12000). Token counts are estimates. Evidence deduplication requires a matching block in actual host-visible context; a persisted cache alone cannot establish that a block survived compaction.
+- If the user asks not to save a turn, switch that exact session to `recall_only` or `off` as requested and do not call ingestion for that content. Hooks may already have received the prompt; pending content is prevented from being delivered after the generation changes.
 - If the user asks to delete or export memory, state that the current MCP toolset does not yet expose those operations; do not simulate them.
 - Do not store secrets, access tokens, passwords, private keys, or chain-of-thought.
 
